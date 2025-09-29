@@ -1,0 +1,95 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+dist/
+build/
+lib/
+
+# Misc
+.DS_Store
+*.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+.env.expample
+
+# Firebase
+.firebase/
+*.cache
+firebase-debug.log
+firestore-debug.log
+functions-debug.log
+ui-debug.log
+pubsub-debug.log
+
+# Firebase Functions
+functions/lib/
+functions/*.log
+functions/.env
+functions/.env.local
+functions/.env.production
+functions/.env.expample
+
+# Client
+client/dist/
+client/node_modules/
+client/.env
+client/.env.local
+client/.env.production
+
+# Vite
+client/.vite/
+client/dist-ssr/
+*.local
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Package manager lock files (choose one)
+# Uncomment the one you use:
+package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# MCP
+.mcp/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/

@@ -1,0 +1,1 @@
+export { FortuneServiceCard } from './FortuneServiceCard';
