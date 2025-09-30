@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { Footer } from '../../components/organisms/Footer';
 import { FortuneServiceCard } from '../../components/molecules/FortuneServiceCard';
 import { tokens } from '../../design-system/tokens';
 
-// Image assets from Figma
-const imgBg1 = '/assets/images/hero-bg.png';
+// Image assets from public folder
+const imgBg1 = "/assets/images/hero-bg.png";
+const imgImg = "/assets/images/fortune-today.png";
+const img1 = "/assets/images/fortune-saju.png";
+const imgFirefly11 = "/assets/images/fortune-compatibility.png";
+const imgFirefly12 = "/assets/images/fortune-love.png";
+const imgFirefly13 = "/assets/images/fortune-wealth.png";
+const img2 = "/assets/images/fortune-tojung.png";
 
 const Container = styled.div`
   background-color: ${tokens.colors.neutral[0]};
@@ -165,69 +170,86 @@ const Divider = styled.div`
   margin: 100px 0;
 `;
 
-// Fortune service data
+// Fortune service data with Figma images
 const fortuneServices = [
   {
     id: 'today',
     title: '오늘의 운세',
     description: '오늘은 어떤 기운이 따를까요?\n오늘 하루를 바꿀 작은 행운',
-    icon: '🔮',
-    color: tokens.colors.primary[500]
+    image: imgImg,
+    nodeId: '141:105'
   },
   {
     id: 'saju',
     title: '사주팔자',
     description: '사주로 보는 내 삶의 설계도,\n태어난 순간이 말해주는 내 인생의 길',
-    icon: '📅',
-    color: tokens.colors.secondary[500]
+    image: img1,
+    nodeId: '141:108'
   },
   {
     id: 'compatibility',
     title: '궁합',
     description: '우린 정말 잘 맞을까?\n궁합으로 알아보는 우리 사이',
-    icon: '💕',
-    color: '#FF69B4'
+    image: imgFirefly11,
+    nodeId: '141:111'
   },
   {
     id: 'love',
     title: '연애운',
     description: '두근거리는 만남의 시작,\n마음을 설레게 할 인연의 기운',
-    icon: '🌸',
-    color: '#FF1493'
+    image: imgFirefly12,
+    nodeId: '141:114'
   },
   {
     id: 'wealth',
     title: '재물운',
     description: '재물이 들어올 타이밍,\n부를 부르는 기운을 확인하세요',
-    icon: '💰',
-    color: '#FFD700'
+    image: imgFirefly13,
+    nodeId: '141:117'
   },
   {
     id: 'tojung',
     title: '토정비결',
     description: '다가오는 한 해의 시작,\n럭키온 토정비결로 걱정 끝',
-    icon: '☀️',
-    color: '#FFA500'
+    image: img2,
+    nodeId: '141:120'
   }
 ];
 
 export const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Signup form state
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState('');
+  const [signupReferralCode, setSignupReferralCode] = useState('');
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: Implement Firebase auth login
-    console.log('Login attempt:', { email, password });
+    console.log('Login attempt:', { loginEmail, loginPassword });
+  };
+
+  const handleSignupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // TODO: Implement Firebase auth signup
+    console.log('Signup attempt:', {
+      signupName,
+      signupEmail,
+      signupPassword,
+      signupPasswordConfirm,
+      signupReferralCode
+    });
   };
 
   const handleTabChange = (tab: 'login' | 'signup') => {
     setActiveTab(tab);
-    if (tab === 'signup') {
-      navigate('/signup');
-    }
   };
 
   return (
@@ -256,8 +278,7 @@ export const LoginPage: React.FC = () => {
               key={service.id}
               title={service.title}
               description={service.description}
-              icon={service.icon}
-              color={service.color}
+              image={service.image}
               data-name={service.id}
             />
           ))}
@@ -290,40 +311,99 @@ export const LoginPage: React.FC = () => {
             </Tab>
           </TabContainer>
 
-          <FormContainer onSubmit={handleSubmit}>
-            <Input
-              type="email"
-              placeholder="이메일"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              data-name="input"
-              data-node-id="85:310"
-            />
-            <Input
-              type="password"
-              placeholder="비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              data-name="input"
-              data-node-id="85:311"
-            />
-            <LoginButton
-              type="submit"
-              variant="primary"
-              size="large"
-              data-name="btn1"
-              data-node-id="85:313"
-            >
-              로그인
-            </LoginButton>
-          </FormContainer>
+          {activeTab === 'login' ? (
+            <>
+              <FormContainer onSubmit={handleLoginSubmit}>
+                <Input
+                  type="email"
+                  placeholder="이메일"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  data-name="input"
+                  data-node-id="85:310"
+                />
+                <Input
+                  type="password"
+                  placeholder="비밀번호"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  data-name="input"
+                  data-node-id="85:311"
+                />
+                <LoginButton
+                  type="submit"
+                  variant="primary"
+                  size="large"
+                  data-name="btn1"
+                  data-node-id="85:313"
+                >
+                  로그인
+                </LoginButton>
+              </FormContainer>
 
-          <SignupPrompt data-node-id="85:312">
-            계정이 없으신가요? {' '}
-            <SignupLink onClick={() => navigate('/signup')}>
-              회원가입
-            </SignupLink>
-          </SignupPrompt>
+              <SignupPrompt data-node-id="85:312">
+                계정이 없으신가요? {' '}
+                <SignupLink onClick={() => handleTabChange('signup')}>
+                  회원가입
+                </SignupLink>
+              </SignupPrompt>
+            </>
+          ) : (
+            <>
+              <FormContainer onSubmit={handleSignupSubmit}>
+                <Input
+                  type="text"
+                  placeholder="이름"
+                  value={signupName}
+                  onChange={(e) => setSignupName(e.target.value)}
+                  data-name="input"
+                />
+                <Input
+                  type="email"
+                  placeholder="이메일"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  data-name="input"
+                />
+                <Input
+                  type="password"
+                  placeholder="비밀번호"
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  data-name="input"
+                />
+                <Input
+                  type="password"
+                  placeholder="비밀번호 확인"
+                  value={signupPasswordConfirm}
+                  onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                  data-name="input"
+                />
+                <Input
+                  type="text"
+                  placeholder="추천인 코드 (선택)"
+                  value={signupReferralCode}
+                  onChange={(e) => setSignupReferralCode(e.target.value)}
+                  data-name="input"
+                />
+                <LoginButton
+                  type="submit"
+                  variant="primary"
+                  size="large"
+                  data-name="btn1"
+                >
+                  가입하기
+                </LoginButton>
+              </FormContainer>
+
+              <SignupPrompt>
+                이미 계정이 있으신가요? {' '}
+                <SignupLink onClick={() => handleTabChange('login')}>
+                  로그인
+                </SignupLink>
+              </SignupPrompt>
+            </>
+          )}
         </LoginSection>
       </ContentSection>
 

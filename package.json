@@ -1,0 +1,22 @@
+{
+  "name": "luckyon",
+  "version": "1.0.0",
+  "description": "LuckyOn AI Fortune Telling Platform",
+  "scripts": {
+    "dev": "firebase emulators:start",
+    "deploy": "firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "test": "npm run test --prefix functions"
+  },
+  "keywords": [
+    "fortune",
+    "ai",
+    "firebase"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}

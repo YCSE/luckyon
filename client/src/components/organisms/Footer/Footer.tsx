@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { tokens } from '../../../design-system/tokens';
 
-const imgLogo = '/assets/images/logo.svg';
+const imgLogo = "/assets/images/logo.svg";
 
 const FooterContainer = styled.footer`
   background-color: ${tokens.colors.neutral[50]};
@@ -12,7 +12,6 @@ const FooterContainer = styled.footer`
   gap: 10px;
   align-items: center;
   justify-content: center;
-  border-top: 1px solid ${tokens.colors.neutral[200]};
 `;
 
 const Logo = styled.div`
@@ -38,37 +37,14 @@ const Copyright = styled.p`
   letter-spacing: 0.5px;
 `;
 
-const Links = styled.div`
-  display: flex;
-  gap: 20px;
-  margin-top: 10px;
-`;
 
-const FooterLink = styled.a`
-  font-family: ${tokens.typography.fontFamily.primary};
-  font-size: 14px;
-  font-weight: ${tokens.typography.fontWeight.light};
-  color: ${tokens.colors.neutral[600]};
-  text-decoration: none;
-  transition: color ${tokens.animation.duration.fast} ${tokens.animation.easing.ease};
-
-  &:hover {
-    color: ${tokens.colors.primary[500]};
-  }
-`;
-
-export const Footer: React.FC = () => {
+export const Footer: React.FC<{ 'data-name'?: string; 'data-node-id'?: string }> = (props) => {
   return (
-    <FooterContainer>
-      <Logo>
+    <FooterContainer {...props}>
+      <Logo data-name="logo" data-node-id="106:73">
         <img src={imgLogo} alt="LuckyOn Logo" />
       </Logo>
-      <Copyright>© LUCKYON. All Rights Reserved.</Copyright>
-      <Links>
-        <FooterLink href="/terms">이용약관</FooterLink>
-        <FooterLink href="/privacy">개인정보처리방침</FooterLink>
-        <FooterLink href="/contact">문의하기</FooterLink>
-      </Links>
+      <Copyright data-node-id="99:243">© KINDVIRAL. All Rights Reserved.</Copyright>
     </FooterContainer>
   );
 };
