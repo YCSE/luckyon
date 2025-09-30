@@ -5,9 +5,9 @@ import { tokens } from '../../../design-system/tokens';
 interface FortuneServiceCardProps {
   title: string;
   description: string;
-  icon: string;
-  color: string;
+  image: string;
   onClick?: () => void;
+  'data-name'?: string;
 }
 
 const Card = styled.div`
@@ -77,57 +77,36 @@ const Description = styled.p`
   white-space: pre-line;
 `;
 
-const IconContainer = styled.div<{ $color: string }>`
-  width: 110px;
+const ImageContainer = styled.div`
   height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, ${props => props.$color}15 0%, ${props => props.$color}30 100%);
-  border-radius: 20px;
-  font-size: 48px;
   flex-shrink: 0;
-  position: relative;
 
-  &::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    background: linear-gradient(135deg, ${props => props.$color} 0%, ${props => props.$color}80 100%);
-    border-radius: 20px;
-    opacity: 0;
-    z-index: -1;
-    transition: opacity ${tokens.animation.duration.base} ${tokens.animation.easing.ease};
-  }
-
-  ${Card}:hover & {
-    &::after {
-      opacity: 0.1;
-    }
+  img {
+    max-height: 100%;
+    max-width: 150px;
+    object-fit: contain;
   }
 `;
 
 export const FortuneServiceCard: React.FC<FortuneServiceCardProps> = ({
   title,
   description,
-  icon,
-  color,
+  image,
   onClick,
   ...props
 }) => {
   return (
-    <Card
-      onClick={onClick}
-      style={{ '--accent-color': color } as React.CSSProperties}
-      {...props}
-    >
+    <Card onClick={onClick} {...props}>
       <TextContainer>
         <Title>{title}</Title>
         <Description>{description}</Description>
       </TextContainer>
-      <IconContainer $color={color}>
-        {icon}
-      </IconContainer>
+      <ImageContainer>
+        <img src={image} alt={title} />
+      </ImageContainer>
     </Card>
   );
 };
