@@ -3,10 +3,13 @@
  * LuckyOn AI 운세 서비스
  */
 import { onRequest, onCall } from 'firebase-functions/v2/https';
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import './config/firebase'; // Firebase Admin 초기화
 import { authService } from './services/auth.service';
 import { fortuneService } from './services/fortune.service';
 import { paymentService } from './services/payment.service';
+import { referralService } from './services/referral.service';
+import { adminService } from './services/admin.service';
 import { toHttpsError, logError, AppError } from './utils/errors';
 import { ErrorCode } from './config/constants';
 import {
@@ -536,6 +539,256 @@ export const generateLoveFortune = onCall({
     return { success: true, data: result };
   } catch (error: any) {
     logError('generateLoveFortune', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+/**
+ * 결제 완료 시 리퍼럴 크레딧 처리 (트리거)
+ */
+export const processReferralCredit = onDocumentUpdated({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 100,
+  document: 'payments/{paymentId}'
+}, async (event) => {
+  try {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+
+    // status가 completed로 변경된 경우만 처리
+    if (before?.status !== 'completed' && after?.status === 'completed') {
+      const paymentId = event.params.paymentId;
+      await referralService.processReferralCredit(paymentId);
+    }
+  } catch (error: any) {
+    logError('processReferralCredit', error, event.params);
+    // 트리거 에러는 로그만 남기고 넘어감
+  }
+});
+
+/**
+ * 리퍼럴 통계 조회
+ */
+export const getReferralStats = onCall({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 50
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const stats = await referralService.getReferralStats(uid);
+
+    return {
+      success: true,
+      data: stats
+    };
+  } catch (error: any) {
+    logError('getReferralStats', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 출금 요청
+ * @param amount - 출금 금액
+ * @param bankAccount - 은행 계좌 정보
+ */
+export const requestWithdrawal = onCall({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 20
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const { amount, bankAccount } = request.data;
+
+    if (!amount || !bankAccount) {
+      throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
+    }
+
+    const withdrawalId = await referralService.requestWithdrawal(uid, amount, bankAccount);
+
+    return {
+      success: true,
+      data: { withdrawalId }
+    };
+  } catch (error: any) {
+    logError('requestWithdrawal', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 출금 승인 (관리자)
+ * @param withdrawalId - 출금 요청 ID
+ * @param note - 처리 메모
+ */
+export const approveWithdrawal = onCall({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 10
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const { withdrawalId, note } = request.data;
+
+    if (!withdrawalId) {
+      throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
+    }
+
+    await referralService.approveWithdrawal(withdrawalId, uid, note);
+
+    return {
+      success: true,
+      message: '출금이 승인되었습니다.'
+    };
+  } catch (error: any) {
+    logError('approveWithdrawal', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 사용자 목록 조회 (관리자)
+ * @param memberGrade - 필터링할 회원 등급 (optional)
+ * @param limit - 페이지 크기
+ * @param startAfter - 마지막 UID (페이지네이션)
+ */
+export const getUsersList = onCall({
+  region: 'asia-northeast3',
+  memory: '2GiB',
+  concurrency: 20
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const { memberGrade, limit, startAfter } = request.data || {};
+
+    const users = await adminService.getUsersList(uid, { memberGrade, limit, startAfter });
+
+    return {
+      success: true,
+      data: users
+    };
+  } catch (error: any) {
+    logError('getUsersList', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 사용자 등급 변경 (관리자)
+ * @param targetUid - 대상 사용자 UID
+ * @param newGrade - 새로운 회원 등급
+ */
+export const updateUserGrade = onCall({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 10
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const { targetUid, newGrade } = request.data;
+
+    if (!targetUid || !newGrade) {
+      throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
+    }
+
+    await adminService.updateUserGrade(uid, targetUid, newGrade);
+
+    return {
+      success: true,
+      message: '회원 등급이 변경되었습니다.'
+    };
+  } catch (error: any) {
+    logError('updateUserGrade', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 서비스 통계 조회 (관리자)
+ */
+export const getAnalytics = onCall({
+  region: 'asia-northeast3',
+  memory: '4GiB',
+  concurrency: 5,
+  timeoutSeconds: 120
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const analytics = await adminService.getAnalytics(uid);
+
+    return {
+      success: true,
+      data: analytics
+    };
+  } catch (error: any) {
+    logError('getAnalytics', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+
+/**
+ * 시스템 설정 업데이트 (관리자)
+ * @param configType - 설정 타입
+ * @param configData - 설정 데이터
+ */
+export const updateSystemConfig = onCall({
+  region: 'asia-northeast3',
+  memory: '1GiB',
+  concurrency: 10
+}, async (request) => {
+  try {
+    const uid = request.auth?.uid;
+
+    if (!uid) {
+      throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
+    }
+
+    const { configType, configData } = request.data;
+
+    if (!configType || !configData) {
+      throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
+    }
+
+    await adminService.updateSystemConfig(uid, configType, configData);
+
+    return {
+      success: true,
+      message: '시스템 설정이 업데이트되었습니다.'
+    };
+  } catch (error: any) {
+    logError('updateSystemConfig', error, request.data);
     throw toHttpsError(error);
   }
 });
