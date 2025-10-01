@@ -10,15 +10,16 @@ import dotSvg from '../../assets/d8f91114e90eb2ee7a139759134ce2400850a8b9.svg';
 
 interface HeaderProps {
   onMenuClick: () => void;
+  menuButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+export const Header: React.FC<HeaderProps> = ({ onMenuClick, menuButtonRef }) => {
   const navigate = useNavigate();
 
   return (
     <Container>
       <LogoImage src={logoSvg} alt="Lucky On" onClick={() => navigate('/')} />
-      <MenuButton onClick={onMenuClick}>
+      <MenuButton ref={menuButtonRef} onClick={onMenuClick}>
         <Dot src={dotSvg} alt="" />
         <Dot src={dotSvg} alt="" />
         <Dot src={dotSvg} alt="" />
@@ -47,13 +48,13 @@ const LogoImage = styled.img`
 
 const MenuButton = styled.button`
   position: absolute;
-  right: 30px;
+  right: 20px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 7px;

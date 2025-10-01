@@ -8,6 +8,7 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
+import { DateInput } from '../../components/atoms/DateInput';
 
 const Container = styled.div`
   max-width: 800px;
@@ -109,8 +110,13 @@ export const CompatibilityPage: React.FC = () => {
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div>
-          <Label>생년월일</Label>
-          <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required />
+          <DateInput
+            label="생년월일"
+            value={birthDate}
+            onChange={setBirthDate}
+            placeholder="예: 1990년 1월 1일"
+            required
+          />
         </div>
 
         <SectionTitle>상대방 정보</SectionTitle>
@@ -119,8 +125,13 @@ export const CompatibilityPage: React.FC = () => {
           <Input type="text" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} required />
         </div>
         <div>
-          <Label>생년월일</Label>
-          <Input type="date" value={partnerBirthDate} onChange={(e) => setPartnerBirthDate(e.target.value)} required />
+          <DateInput
+            label="생년월일"
+            value={partnerBirthDate}
+            onChange={setPartnerBirthDate}
+            placeholder="예: 1990년 1월 1일"
+            required
+          />
         </div>
 
         <Button type="submit" disabled={loading}>

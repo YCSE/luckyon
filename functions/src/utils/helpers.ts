@@ -59,10 +59,38 @@ export const formatDate = (date: Date): string => {
 };
 
 /**
+ * 날짜를 한국 형식으로 변환 (yyyy년 m월 d일)
+ */
+export const formatKoreanDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${year}년 ${month}월 ${day}일`;
+};
+
+/**
+ * YYYY-MM-DD 형식의 문자열을 한국 형식으로 변환
+ */
+export const formatKoreanDateFromString = (dateString: string): string => {
+  const date = new Date(dateString);
+  return formatKoreanDate(date);
+};
+
+/**
  * 시간을 HH:MM 형식으로 변환
  */
 export const formatTime = (date: Date): string => {
   return format(date, 'HH:mm');
+};
+
+/**
+ * 시간을 한국 형식으로 변환 (오전/오후 h시 m분)
+ */
+export const formatKoreanTime = (timeString: string): string => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const period = hours < 12 ? '오전' : '오후';
+  const displayHours = hours % 12 || 12;
+  return `${period} ${displayHours}시 ${minutes}분`;
 };
 
 /**

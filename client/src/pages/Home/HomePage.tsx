@@ -2,7 +2,7 @@
  * Home Page
  * 6개 운세 서비스 선택 화면
  */
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Header } from '../../components/layout/Header';
@@ -85,6 +85,7 @@ const services: ServiceItem[] = [
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleServiceClick = (path: string) => {
     navigate(path);
@@ -93,8 +94,8 @@ export const HomePage: React.FC = () => {
   return (
     <PageWrapper>
       <Container>
-        <Header onMenuClick={() => setMenuOpen(true)} />
-        <HamburgerMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
+        <Header onMenuClick={() => setMenuOpen(true)} menuButtonRef={menuButtonRef} />
+        <HamburgerMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} menuButtonRef={menuButtonRef} />
 
         <ServiceList>
           {services.map((service) => (

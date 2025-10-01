@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '../config/firebase';
 import { AppError } from '../utils/errors';
 import { ErrorCode, CACHE_DURATION, ServiceType } from '../config/constants';
-import { generateFortuneId } from '../utils/helpers';
+import { generateFortuneId, formatKoreanDate, formatKoreanDateFromString, formatKoreanTime } from '../utils/helpers';
 import { FortuneResult, FortuneRequestData, AIResponse } from '../types';
 import { Timestamp } from 'firebase-admin/firestore';
 import { GEMINI_API_KEY } from '../config/environment';
@@ -256,13 +256,16 @@ export class FortuneService {
    * 오늘의 운세 프롬프트
    */
   private getTodayPrompt(data: FortuneRequestData): string {
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const todayKorean = formatKoreanDate(new Date());
+
     return `
 당신은 전문 운세 전문가입니다. 다음 정보를 바탕으로 오늘의 운세를 작성해주세요.
 
 **사용자 정보:**
 - 이름: ${data.name}
-- 생년월일: ${data.birthDate}
-- 오늘 날짜: ${new Date().toISOString().split('T')[0]}
+- 생년월일: ${birthDateKorean}
+- 오늘 날짜: ${todayKorean}
 
 **작성 가이드:**
 1. 전체 운세 (종합운)
@@ -279,38 +282,170 @@ HTML 형식으로 작성하되, 따뜻하고 긍정적인 톤으로 작성해주
   }
 
   /**
-   * 사주팔자 프롬프트 (임시)
+   * 사주팔자 프롬프트
    */
   private getSajuPrompt(data: FortuneRequestData): string {
-    return `사주팔자 운세: ${data.name}, ${data.birthDate}, ${data.birthTime}`;
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const birthTimeKorean = data.birthTime ? formatKoreanTime(data.birthTime) : '';
+
+    return `
+당신은 전문 사주팔자 전문가입니다. 다음 정보를 바탕으로 사주팔자를 분석해주세요.
+
+**사용자 정보:**
+- 이름: ${data.name}
+- 생년월일: ${birthDateKorean}
+- 생시: ${birthTimeKorean}
+
+**작성 가이드:**
+1. 사주팔자 구성 (천간, 지지)
+2. 오행 분석
+3. 성격 및 기질
+4. 직업 및 재물운
+5. 건강운
+6. 인간관계
+7. 조언 및 주의사항
+
+**출력 형식:**
+HTML 형식으로 작성하되, 전문적이고 상세한 톤으로 작성해주세요.
+각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+    `.trim();
   }
 
   /**
-   * 토정비결 프롬프트 (임시)
+   * 토정비결 프롬프트
    */
   private getTojungPrompt(data: FortuneRequestData): string {
-    return `토정비결 운세: ${data.name}, ${data.birthDate}, 음력: ${data.lunarCalendar}`;
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const currentYear = new Date().getFullYear();
+
+    return `
+당신은 토정비결 전문가입니다. 다음 정보를 바탕으로 ${currentYear}년 한 해의 운세를 작성해주세요.
+
+**사용자 정보:**
+- 이름: ${data.name}
+- 생년월일: ${birthDateKorean}
+- 달력 종류: ${data.lunarCalendar ? '음력' : '양력'}
+
+**작성 가이드:**
+1. 연간 총운
+2. 월별 운세 (12개월)
+3. 사업운
+4. 재물운
+5. 건강운
+6. 가정운
+7. 조언
+
+**출력 형식:**
+HTML 형식으로 작성하되, 전통적이면서도 이해하기 쉬운 톤으로 작성해주세요.
+각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+    `.trim();
   }
 
   /**
-   * 궁합 프롬프트 (임시)
+   * 궁합 프롬프트
    */
   private getCompatibilityPrompt(data: FortuneRequestData): string {
-    return `궁합 운세: ${data.name}와 ${data.partnerName}`;
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const partnerBirthDateKorean = data.partnerBirthDate
+      ? formatKoreanDateFromString(data.partnerBirthDate)
+      : '';
+
+    return `
+당신은 궁합 전문가입니다. 다음 두 사람의 궁합을 분석해주세요.
+
+**본인 정보:**
+- 이름: ${data.name}
+- 생년월일: ${birthDateKorean}
+
+**상대방 정보:**
+- 이름: ${data.partnerName}
+- 생년월일: ${partnerBirthDateKorean}
+
+**작성 가이드:**
+1. 전체 궁합 점수 및 평가
+2. 성격 궁합
+3. 연애 궁합
+4. 결혼 궁합
+5. 금전 궁합
+6. 주의할 점
+7. 조언
+
+**출력 형식:**
+HTML 형식으로 작성하되, 따뜻하고 긍정적인 톤으로 작성해주세요.
+각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+    `.trim();
   }
 
   /**
-   * 재물운 프롬프트 (임시)
+   * 재물운 프롬프트
    */
   private getWealthPrompt(data: FortuneRequestData): string {
-    return `재물운: ${data.name}, ${data.jobType}`;
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const todayKorean = formatKoreanDate(new Date());
+
+    return `
+당신은 재물운 전문가입니다. 다음 정보를 바탕으로 재물운을 분석해주세요.
+
+**사용자 정보:**
+- 이름: ${data.name}
+- 생년월일: ${birthDateKorean}
+- 직업: ${data.jobType}
+- 오늘 날짜: ${todayKorean}
+
+**작성 가이드:**
+1. 전체 재물운
+2. 수입운
+3. 투자운
+4. 사업운
+5. 행운의 재물 방향
+6. 주의사항
+7. 오늘의 조언
+
+**출력 형식:**
+HTML 형식으로 작성하되, 실용적이고 현실적인 톤으로 작성해주세요.
+각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+    `.trim();
   }
 
   /**
-   * 연애운 프롬프트 (임시)
+   * 연애운 프롬프트
    */
   private getLovePrompt(data: FortuneRequestData): string {
-    return `연애운: ${data.name}, ${data.gender}, ${data.relationshipStatus}`;
+    const birthDateKorean = formatKoreanDateFromString(data.birthDate);
+    const todayKorean = formatKoreanDate(new Date());
+
+    const genderText = data.gender === 'male' ? '남성' : '여성';
+    let statusText = '';
+    switch (data.relationshipStatus) {
+      case 'single': statusText = '싱글'; break;
+      case 'dating': statusText = '연애 중'; break;
+      case 'married': statusText = '기혼'; break;
+      case 'divorced': statusText = '이혼'; break;
+    }
+
+    return `
+당신은 연애운 전문가입니다. 다음 정보를 바탕으로 연애운을 분석해주세요.
+
+**사용자 정보:**
+- 이름: ${data.name}
+- 생년월일: ${birthDateKorean}
+- 성별: ${genderText}
+- 현재 상태: ${statusText}
+- 오늘 날짜: ${todayKorean}
+
+**작성 가이드:**
+1. 전체 연애운
+2. 만남의 운
+3. 이상형 분석
+4. 현재 관계 조언 (해당되는 경우)
+5. 주의사항
+6. 행운의 장소/시간
+7. 오늘의 조언
+
+**출력 형식:**
+HTML 형식으로 작성하되, 따뜻하고 로맨틱한 톤으로 작성해주세요.
+각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+    `.trim();
   }
 }
 
