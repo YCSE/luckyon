@@ -14,7 +14,18 @@ import flowerImg from '../../assets/fe742ae1dd4747cc2854c5d0189f0053a9c90747.png
 import goldImg from '../../assets/574ea26519541404f65e73f895ac7b0628722845.png';
 import sunImg from '../../assets/f91bf7f4e37f21063f53872048d7d211187b53d3.png';
 
-const services = [
+interface ServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  imageWidth: string;
+  imageHeight: string;
+  imageFlip?: boolean;
+  path: string;
+}
+
+const services: ServiceItem[] = [
   {
     id: 'today',
     title: '오늘의 운세',
