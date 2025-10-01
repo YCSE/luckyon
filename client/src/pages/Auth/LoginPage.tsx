@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { Footer } from '../../components/organisms/Footer';
 import { FortuneServiceCard } from '../../components/molecules/FortuneServiceCard';
 import { tokens } from '../../design-system/tokens';
+import { authAPI } from '../../services/api';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 
 // Image assets from public folder
 const imgBg1 = "/assets/images/hero-bg.png";
@@ -170,6 +174,14 @@ const Divider = styled.div`
   margin: 100px 0;
 `;
 
+const ErrorMessage = styled.div`
+  color: #ff4444;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-family: ${tokens.typography.fontFamily.primary};
+`;
+
 // Fortune service data with Figma images
 const fortuneServices = [
   {
@@ -217,7 +229,10 @@ const fortuneServices = [
 ];
 
 export const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -230,22 +245,83 @@ export const LoginPage: React.FC = () => {
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState('');
   const [signupReferralCode, setSignupReferralCode] = useState('');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement Firebase auth login
-    console.log('Login attempt:', { loginEmail, loginPassword });
+    setError('');
+    setLoading(true);
+
+    try {
+      // 1. Firebase Auth로 로그인
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+
+      // 2. 로그인 성공 - 홈으로 이동
+      navigate('/');
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        setError('존재하지 않는 사용자입니다.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('비밀번호가 올바르지 않습니다.');
+      } else {
+        setError(err.message || '로그인 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement Firebase auth signup
-    console.log('Signup attempt:', {
-      signupName,
-      signupEmail,
-      signupPassword,
-      signupPasswordConfirm,
-      signupReferralCode
-    });
+    setError('');
+
+    // Validate password match
+    if (signupPassword !== signupPasswordConfirm) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    // Validate password length
+    if (signupPassword.length < 6) {
+      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Firebase Auth로 사용자 생성
+      await createUserWithEmailAndPassword(auth, signupEmail, signupPassword);
+
+      // 2. Functions 호출하여 추가 사용자 데이터 설정
+      const signupData: any = {
+        email: signupEmail,
+        password: signupPassword,
+        displayName: signupName
+      };
+
+      // Only add referralCode if it's not empty
+      if (signupReferralCode && signupReferralCode.trim() !== '') {
+        signupData.referralCode = signupReferralCode.trim();
+      }
+
+      const response: any = await authAPI.signup(signupData);
+
+      if (response.success && response.data) {
+        // 4. 사용자가 이미 Firebase Auth로 로그인되었으므로 홈으로 이동
+        navigate('/');
+      } else {
+        setError(response.message || '회원가입에 실패했습니다.');
+      }
+    } catch (err: any) {
+      if (err.code === 'auth/email-already-in-use') {
+        setError('이미 사용 중인 이메일입니다.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('비밀번호는 최소 6자 이상이어야 합니다.');
+      } else {
+        setError(err.message || '회원가입 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleTabChange = (tab: 'login' | 'signup') => {
@@ -314,11 +390,14 @@ export const LoginPage: React.FC = () => {
           {activeTab === 'login' ? (
             <>
               <FormContainer onSubmit={handleLoginSubmit}>
+                {error && <ErrorMessage>{error}</ErrorMessage>}
                 <Input
                   type="email"
                   placeholder="이메일"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                   data-node-id="85:310"
                 />
@@ -327,6 +406,8 @@ export const LoginPage: React.FC = () => {
                   placeholder="비밀번호"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                   data-node-id="85:311"
                 />
@@ -334,10 +415,11 @@ export const LoginPage: React.FC = () => {
                   type="submit"
                   variant="primary"
                   size="large"
+                  disabled={loading}
                   data-name="btn1"
                   data-node-id="85:313"
                 >
-                  로그인
+                  {loading ? '로그인 중...' : '로그인'}
                 </LoginButton>
               </FormContainer>
 
@@ -351,11 +433,14 @@ export const LoginPage: React.FC = () => {
           ) : (
             <>
               <FormContainer onSubmit={handleSignupSubmit}>
+                {error && <ErrorMessage>{error}</ErrorMessage>}
                 <Input
                   type="text"
                   placeholder="이름"
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                 />
                 <Input
@@ -363,6 +448,8 @@ export const LoginPage: React.FC = () => {
                   placeholder="이메일"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                 />
                 <Input
@@ -370,6 +457,8 @@ export const LoginPage: React.FC = () => {
                   placeholder="비밀번호"
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                 />
                 <Input
@@ -377,6 +466,8 @@ export const LoginPage: React.FC = () => {
                   placeholder="비밀번호 확인"
                   value={signupPasswordConfirm}
                   onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                  required
+                  disabled={loading}
                   data-name="input"
                 />
                 <Input
@@ -384,15 +475,17 @@ export const LoginPage: React.FC = () => {
                   placeholder="추천인 코드 (선택)"
                   value={signupReferralCode}
                   onChange={(e) => setSignupReferralCode(e.target.value)}
+                  disabled={loading}
                   data-name="input"
                 />
                 <LoginButton
                   type="submit"
                   variant="primary"
                   size="large"
+                  disabled={loading}
                   data-name="btn1"
                 >
-                  가입하기
+                  {loading ? '가입 중...' : '가입하기'}
                 </LoginButton>
               </FormContainer>
 

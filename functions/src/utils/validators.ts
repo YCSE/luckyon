@@ -18,7 +18,7 @@ export const nameSchema = Joi.string().min(2).max(50).required();
 export const phoneNumberSchema = Joi.string().pattern(/^010-\d{4}-\d{4}$/).optional();
 
 // 레퍼럴 코드 검증 스키마 (8자리 영문+숫자)
-export const referralCodeSchema = Joi.string().length(8).pattern(/^[A-Z0-9]{8}$/).optional();
+export const referralCodeSchema = Joi.string().length(8).pattern(/^[A-Z0-9]{8}$/).optional().allow(null, '');
 
 // 생년월일 검증 스키마 (YYYY-MM-DD)
 export const birthDateSchema = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required();

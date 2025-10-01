@@ -284,8 +284,8 @@ export class PaymentService {
    */
   private async getPortOnePayment(impUid: string): Promise<any> {
     try {
-      const impCode = PORTONE_IMP_CODE.value();
-      const apiSecret = PORTONE_API_SECRET.value();
+      const impCode = PORTONE_IMP_CODE;
+      const apiSecret = PORTONE_API_SECRET;
 
       if (!impCode || !apiSecret) {
         throw new AppError(ErrorCode.SYS002, 'PortOne API 설정이 누락되었습니다.');

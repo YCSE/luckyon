@@ -3,6 +3,7 @@
  */
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import * as PortOne from '@portone/browser-sdk/v2';
 import { useAuth } from '../../contexts/AuthContext';
 import { paymentAPI } from '../../services/api';
 import { PricingCard } from '../../components/organisms/PricingCard/PricingCard';
@@ -78,7 +79,7 @@ export const PricingPage: React.FC = () => {
     }
 
     try {
-      // 1. 결제 생성
+      // 1. 결제 생성 (Firebase Functions에서 merchantUid 생성)
       const response: any = await paymentAPI.create({
         paymentType,
         productType,
@@ -86,13 +87,61 @@ export const PricingPage: React.FC = () => {
       });
 
       if (response.success) {
-        const { merchantUid, paymentId } = response.data;
+        const { merchantUid, productName, amount: paymentAmount } = response.data;
 
-        // 2. PortOne 결제 모듈 호출 (실제 구현 시 PortOne SDK 사용)
-        alert(`결제 준비 완료\nMerchant UID: ${merchantUid}\nPayment ID: ${paymentId}\n\n실제 서비스에서는 PortOne 결제 창이 열립니다.`);
+        // 2. PortOne V2 결제창 호출
+        const portOneResponse = await PortOne.requestPayment({
+          storeId: import.meta.env.VITE_PORTONE_STORE_ID,
+          channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY,
+          paymentId: merchantUid,
+          orderName: productName,
+          totalAmount: paymentAmount,
+          currency: 'CURRENCY_KRW',
+          payMethod: 'CARD',
+          customer: {
+            email: user.email || undefined,
+            phoneNumber: user.phoneNumber || undefined
+          }
+        });
 
-        // 3. 결제 완료 후 verifyPayment, completePayment 호출
-        // (PortOne SDK 콜백에서 처리)
+        // 3. 결제 결과 처리
+        if (portOneResponse?.code !== undefined) {
+          // 결제 실패
+          alert(`결제 실패: ${portOneResponse.message}`);
+          return;
+        }
+
+        // 4. 결제 성공 - 검증 및 완료 처리
+        if (portOneResponse?.paymentId) {
+          try {
+            // 4-1. 결제 검증
+            const verifyResponse: any = await paymentAPI.verify(
+              portOneResponse.paymentId,
+              merchantUid
+            );
+
+            if (verifyResponse.success) {
+              // 4-2. 결제 완료 처리
+              const completeResponse: any = await paymentAPI.complete(
+                portOneResponse.paymentId,
+                merchantUid
+              );
+
+              if (completeResponse.success) {
+                alert('결제가 완료되었습니다!');
+                // 결제 완료 후 페이지 이동 또는 리프레시
+                window.location.href = '/';
+              } else {
+                alert('결제 완료 처리 중 오류가 발생했습니다.');
+              }
+            } else {
+              alert('결제 검증에 실패했습니다.');
+            }
+          } catch (error: any) {
+            console.error('Payment verification error:', error);
+            alert('결제 확인 중 오류가 발생했습니다: ' + error.message);
+          }
+        }
       }
     } catch (error: any) {
       console.error('Payment error:', error);

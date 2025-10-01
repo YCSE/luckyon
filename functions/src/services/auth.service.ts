@@ -18,36 +18,24 @@ interface SignupData {
   referralCode?: string;
 }
 
-interface SignupResult {
-  uid: string;
-  email: string;
-  displayName: string;
-  referralCode: string;
-  memberGrade: string;
-  customToken: string;
-}
-
-interface LoginResult {
-  uid: string;
-  email: string;
-  displayName: string;
-  memberGrade: string;
-  customToken: string;
-}
 
 export class AuthService {
   /**
-   * 사용자 회원가입
+   * 사용자 회원가입 (Firebase Auth 사용자는 이미 클라이언트에서 생성됨)
    */
-  async signup(data: SignupData): Promise<SignupResult> {
+  async signup(data: SignupData): Promise<any> {
     try {
-      // 1. Firebase Auth 사용자 생성
-      const userRecord = await auth.createUser({
-        email: data.email,
-        password: data.password,
-        displayName: data.displayName,
-        phoneNumber: data.phoneNumber
-      });
+      // 1. 이메일로 기존 사용자 조회 (Firebase Auth에서 이미 생성된 사용자)
+      let userRecord;
+      try {
+        userRecord = await auth.getUserByEmail(data.email);
+      } catch (error: any) {
+        // 사용자가 없는 경우 - 이는 정상적인 상황 (첫 회원가입)
+        if (error.code === 'auth/user-not-found') {
+          throw new AppError(ErrorCode.AUTH002, '사용자를 찾을 수 없습니다. 클라이언트에서 먼저 Firebase Auth로 사용자를 생성해주세요.');
+        }
+        throw error;
+      }
 
       // 2. 레퍼럴 코드 생성 (8자리 영문+숫자)
       let referralCode = generateReferralCode();
@@ -121,16 +109,13 @@ export class AuthService {
         });
       }
 
-      // 6. Custom Token 생성
-      const customToken = await auth.createCustomToken(userRecord.uid);
-
+      // 6. 회원가입 성공 응답 (토큰 없이)
       return {
         uid: userRecord.uid,
         email: data.email,
         displayName: data.displayName,
         referralCode,
-        memberGrade: MEMBER_GRADES.MEMBER,
-        customToken
+        memberGrade: MEMBER_GRADES.MEMBER
       };
     } catch (error: any) {
       // Firebase Auth 에러 처리
@@ -155,9 +140,9 @@ export class AuthService {
   }
 
   /**
-   * 사용자 로그인
+   * 사용자 로그인 (Firebase Auth는 이미 클라이언트에서 처리됨)
    */
-  async login(email: string, password: string): Promise<LoginResult> {
+  async login(email: string, password: string): Promise<any> {
     try {
       // 1. 이메일로 사용자 조회
       const userRecord = await auth.getUserByEmail(email);
@@ -177,15 +162,13 @@ export class AuthService {
         updatedAt: Timestamp.now()
       });
 
-      // 4. Custom Token 생성
-      const customToken = await auth.createCustomToken(userRecord.uid);
-
+      // 4. 사용자 정보 반환 (토큰 없이)
       return {
         uid: userRecord.uid,
         email: userData.email,
         displayName: userData.displayName,
         memberGrade: userData.memberGrade,
-        customToken
+        referralCode: userData.referralCode
       };
     } catch (error: any) {
       if (error instanceof AppError) {

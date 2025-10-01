@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
     "firebase-tools": "^13.0.0"
   }
 }

@@ -13,14 +13,16 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { GEMINI_API_KEY } from '../config/environment';
 
 export class FortuneService {
-  private genAI: GoogleGenerativeAI;
+  private genAI?: GoogleGenerativeAI;
 
-  constructor() {
-    const apiKey = GEMINI_API_KEY.value();
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured');
+  private getGenAI(): GoogleGenerativeAI {
+    if (!this.genAI) {
+      if (!GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
+      }
+      this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     }
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    return this.genAI;
   }
 
   /**
@@ -123,7 +125,7 @@ export class FortuneService {
       const prompt = this.getPrompt(serviceType, inputData);
 
       // 2. Gemini AI 호출
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.getGenAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
       const result = await model.generateContent(prompt);
       const response = result.response;
       const text = response.text();
