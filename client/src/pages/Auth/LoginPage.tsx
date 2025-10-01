@@ -7,7 +7,7 @@ import { Footer } from '../../components/organisms/Footer';
 import { FortuneServiceCard } from '../../components/molecules/FortuneServiceCard';
 import { tokens } from '../../design-system/tokens';
 import { authAPI } from '../../services/api';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 
 // Image assets from public folder
@@ -182,6 +182,35 @@ const ErrorMessage = styled.div`
   font-family: ${tokens.typography.fontFamily.primary};
 `;
 
+const SuccessMessage = styled.div`
+  color: #44aa44;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-family: ${tokens.typography.fontFamily.primary};
+`;
+
+const ForgotPasswordLink = styled.div`
+  text-align: right;
+  margin-top: 10px;
+  margin-bottom: 10px;
+
+  a {
+    font-family: ${tokens.typography.fontFamily.primary};
+    font-size: 13px;
+    font-weight: ${tokens.typography.fontWeight.regular};
+    color: #777777;
+    cursor: pointer;
+    text-decoration: none;
+    letter-spacing: -0.65px;
+
+    &:hover {
+      color: ${tokens.colors.primary[500]};
+      text-decoration: underline;
+    }
+  }
+`;
+
 // Fortune service data with Figma images
 const fortuneServices = [
   {
@@ -233,6 +262,7 @@ export const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -324,8 +354,37 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError('');
+    setSuccessMessage('');
+
+    if (!loginEmail) {
+      setError('비밀번호 재설정을 위해 이메일을 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      setSuccessMessage('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.');
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        setError('존재하지 않는 이메일입니다.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('올바른 이메일 주소를 입력해주세요.');
+      } else {
+        setError('비밀번호 재설정 이메일 발송에 실패했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleTabChange = (tab: 'login' | 'signup') => {
     setActiveTab(tab);
+    setError('');
+    setSuccessMessage('');
   };
 
   return (
@@ -391,6 +450,7 @@ export const LoginPage: React.FC = () => {
             <>
               <FormContainer onSubmit={handleLoginSubmit}>
                 {error && <ErrorMessage>{error}</ErrorMessage>}
+                {successMessage && <SuccessMessage>{successMessage}</SuccessMessage>}
                 <Input
                   type="email"
                   placeholder="이메일"
@@ -411,6 +471,11 @@ export const LoginPage: React.FC = () => {
                   data-name="input"
                   data-node-id="85:311"
                 />
+                <ForgotPasswordLink>
+                  <a onClick={handleForgotPassword}>
+                    비밀번호를 잊으셨나요?
+                  </a>
+                </ForgotPasswordLink>
                 <LoginButton
                   type="submit"
                   variant="primary"

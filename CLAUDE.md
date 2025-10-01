@@ -15,6 +15,7 @@ LuckyOn은 Google Gemini AI를 활용한 종합 운세 서비스 플랫폼입니
 ```
 luckyon/
 ├── CLAUDE.md                 # 프로젝트 전체 가이드 (현재 문서)
+├── COMPONENTS.md             # 프론트엔드 컴포넌트 가이드 (SSOT)
 ├── FUNCTIONS.md              # 모든 Firebase Functions 정의 (SSOT)
 ├── .env.local               # 로컬 환경변수
 ├── .env.production          # 프로덕션 환경변수
@@ -37,6 +38,12 @@ luckyon/
 ├── client/                  # React 클라이언트
 │   ├── package.json
 │   ├── src/
+│   │   ├── components/    # Atomic Design 패턴 컴포넌트
+│   │   ├── pages/         # 페이지 컴포넌트
+│   │   ├── contexts/      # React Context
+│   │   ├── services/      # API 호출 로직
+│   │   ├── design-system/ # 디자인 토큰
+│   │   └── utils/         # 유틸리티 함수
 │   └── public/
 └── docs/                    # 추가 문서
 ```
@@ -293,8 +300,55 @@ service cloud.firestore {
 - [ ] 성능 최적화
 - [ ] 프로덕션 배포
 
+## 프론트엔드 개발
+
+### 기술 스택
+- React 18 + TypeScript
+- styled-components
+- React Router v6
+- Firebase SDK
+- Atomic Design 패턴
+
+### 개발 가이드
+
+**중요**: 모든 프론트엔드 작업은 [COMPONENTS.md](./COMPONENTS.md)를 참조해야 합니다.
+
+COMPONENTS.md는 프론트엔드 개발의 **단일 진실의 원천(SSOT)** 이며, 다음 내용을 포함합니다:
+- 디자인 시스템 토큰 (색상, 타이포그래피, 간격 등)
+- Atomic Design 패턴 구조
+- styled-components 스타일링 가이드
+- 컴포넌트 작성 규칙
+- 페이지 구조 분석
+- API 호출 패턴
+- 폼 처리 패턴
+- 날짜 처리 (한국 형식)
+- 에러 처리 및 접근성
+
+### 클라이언트 실행
+
+```bash
+cd client
+npm install
+npm run dev        # 개발 서버 시작 (포트 3000)
+npm run build      # 프로덕션 빌드
+npm run preview    # 빌드 미리보기
+```
+
+### 컴포넌트 작성 체크리스트
+
+새로운 컴포넌트를 만들 때:
+- [ ] [COMPONENTS.md](./COMPONENTS.md) 가이드 준수
+- [ ] TypeScript 인터페이스 정의
+- [ ] 디자인 토큰 사용 (하드코딩 금지)
+- [ ] Atomic Design 패턴 따르기
+- [ ] 반응형 디자인 적용
+- [ ] 접근성 고려
+- [ ] 에러 처리 구현
+- [ ] 한국 날짜 형식 사용 (yyyy년 m월 d일)
+
 ## 참고 문서
 
+- **프론트엔드 컴포넌트 가이드**: [COMPONENTS.md](./COMPONENTS.md) ⭐
 - **Functions 구현 가이드**: [functions/CLAUDE.md](./functions/CLAUDE.md)
 - **Functions 정의 명세**: [FUNCTIONS.md](./FUNCTIONS.md)
 - **기술 기획서**: 프로젝트 문서 참조
@@ -327,5 +381,6 @@ firebase functions:config:get
 ---
 
 **주의**: 이 문서는 프로젝트 전체 개요를 제공합니다. 구체적인 구현은 하위 문서들을 참조하세요.
-- Functions 구현: [functions/CLAUDE.md](./functions/CLAUDE.md)
-- Functions 정의: [FUNCTIONS.md](./FUNCTIONS.md)
+- **프론트엔드 개발**: [COMPONENTS.md](./COMPONENTS.md) ⭐
+- **Functions 구현**: [functions/CLAUDE.md](./functions/CLAUDE.md)
+- **Functions 정의**: [FUNCTIONS.md](./FUNCTIONS.md)
