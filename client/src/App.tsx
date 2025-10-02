@@ -16,6 +16,7 @@ import { CompatibilityPage } from './pages/Fortune/CompatibilityPage';
 import { WealthPage } from './pages/Fortune/WealthPage';
 import { LovePage } from './pages/Fortune/LovePage';
 import { PricingPage } from './pages/Pricing/PricingPage';
+import { PaymentRedirectPage } from './pages/Payment/PaymentRedirectPage';
 
 export const App: React.FC = () => {
   return (
@@ -92,6 +93,16 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <PricingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Payment Redirect Route */}
+          <Route
+            path="/payment/redirect"
+            element={
+              <ProtectedRoute>
+                <PaymentRedirectPage />
               </ProtectedRoute>
             }
           />

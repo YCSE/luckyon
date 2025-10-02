@@ -42,8 +42,9 @@ export const getFortuneHistory = async (uid: string): Promise<FortuneResult[]> =
     const fortuneResultsRef = collection(db, 'fortune_results');
     const q = query(
       fortuneResultsRef,
-      where('uid', '==', uid),
-      orderBy('createdAt', 'desc')
+      where('uid', '==', uid)
+      // TODO: orderBy requires composite index - waiting for index to build
+      // orderBy('createdAt', 'desc')
     );
 
     const querySnapshot = await getDocs(q);
@@ -62,6 +63,9 @@ export const getFortuneHistory = async (uid: string): Promise<FortuneResult[]> =
         expiresAt: data.expiresAt.toDate()
       });
     });
+
+    // Sort on client side until index is built
+    results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return results;
   } catch (error) {

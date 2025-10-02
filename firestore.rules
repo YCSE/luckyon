@@ -23,31 +23,51 @@ service cloud.firestore {
 
     // payments: Functions만 접근
     match /payments/{paymentId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
       allow write: if false;
     }
 
     // fortune_results: 본인 데이터만 읽기
     match /fortune_results/{resultId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
       allow write: if false;
     }
 
     // subscriptions: 본인 구독만 읽기
     match /subscriptions/{subId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
       allow write: if false;
     }
 
     // referral_credits: 본인 크레딧만 읽기
     match /referral_credits/{creditId} {
-      allow read: if isOwner(resource.data.referrerId) || isAdmin();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.referrerId == request.auth.uid ||
+        isAdmin()
+      );
       allow write: if false;
     }
 
     // withdrawal_requests: 본인 요청만 읽기
     match /withdrawal_requests/{requestId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
       allow write: if false;
     }
 

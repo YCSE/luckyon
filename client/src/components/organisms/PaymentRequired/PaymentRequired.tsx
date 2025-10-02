@@ -33,23 +33,38 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
     amount: number,
     paymentType: 'oneTime' | 'subscription'
   ) => {
+    console.log('[PaymentRequired] handlePurchase called with:', { purchaseProductType, amount, paymentType });
+
     if (!user) {
       alert('로그인이 필요합니다.');
       return;
     }
 
+    console.log('[PaymentRequired] User authenticated:', user.uid);
+
     try {
       // 1. 결제 생성
+      console.log('[PaymentRequired] Calling paymentAPI.create...');
       const response: any = await paymentAPI.create({
         paymentType,
         productType: purchaseProductType,
         amount
       });
+      console.log('[PaymentRequired] createPayment response:', response);
 
       if (response.success) {
         const { merchantUid, productName, amount: paymentAmount } = response.data;
 
-        // 2. PortOne V2 결제창 호출
+        // 2. PortOne V2 결제창 호출 (callback 방식)
+        console.log('[PaymentRequired] Calling PortOne.requestPayment...');
+        console.log('[PaymentRequired] Payment params:', {
+          storeId: import.meta.env.VITE_PORTONE_STORE_ID,
+          channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY,
+          paymentId: merchantUid,
+          orderName: productName,
+          totalAmount: paymentAmount
+        });
+
         const portOneResponse = await PortOne.requestPayment({
           storeId: import.meta.env.VITE_PORTONE_STORE_ID,
           channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY,
@@ -64,51 +79,82 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
           }
         });
 
+        console.log('[PaymentRequired] PortOne SDK response received!');
+        console.log('[PaymentRequired] PortOne SDK response:', portOneResponse);
+
         // 3. 결제 결과 처리
         if (portOneResponse?.code !== undefined) {
+          console.error('[PaymentRequired] Payment failed:', portOneResponse);
           alert(`결제 실패: ${portOneResponse.message}`);
           return;
         }
 
         // 4. 결제 성공 - 검증 및 완료 처리
-        if (portOneResponse?.paymentId) {
+        // PortOne V2 SDK는 성공 시 paymentId가 아닌 transactionId를 반환할 수 있음
+        const paymentIdFromResponse = portOneResponse?.paymentId || portOneResponse?.transactionId;
+        console.log('[PaymentRequired] Payment ID from response:', paymentIdFromResponse);
+
+        if (paymentIdFromResponse) {
           try {
+            console.log('[PaymentRequired] Calling verifyPayment with:', { paymentId: paymentIdFromResponse, merchantUid });
             const verifyResponse: any = await paymentAPI.verify(
-              portOneResponse.paymentId,
+              paymentIdFromResponse,
               merchantUid
             );
+            console.log('[PaymentRequired] Verify response:', verifyResponse);
 
             if (verifyResponse.success) {
+              console.log('[PaymentRequired] Calling completePayment with:', { paymentId: paymentIdFromResponse, merchantUid });
               const completeResponse: any = await paymentAPI.complete(
-                portOneResponse.paymentId,
+                paymentIdFromResponse,
                 merchantUid
               );
+              console.log('[PaymentRequired] Complete response:', completeResponse);
 
               if (completeResponse.success) {
-                alert('결제가 완료되었습니다!');
+                console.log('[PaymentRequired] Payment completed successfully:', completeResponse);
 
                 // 사용자 정보를 갱신하여 결제 권한을 업데이트
+                console.log('[PaymentRequired] Refreshing user info...');
                 await refreshUserInfo();
+                console.log('[PaymentRequired] User info refreshed');
 
-                // 페이지 새로고침 (권한이 업데이트되었으므로)
-                window.location.reload();
+                // 결제 타입에 따라 적절한 페이지로 이동
+                if (paymentType === 'subscription') {
+                  // 구독: 현재 서비스 페이지 reload (이제 접근 가능)
+                  alert('결제가 완료되었습니다! 서비스를 이용할 수 있습니다.');
+                  console.log('[PaymentRequired] Reloading page after subscription payment');
+                  window.location.reload();
+                } else {
+                  // 일회성: 현재 서비스 페이지 reload (이제 접근 가능)
+                  alert('결제가 완료되었습니다! 서비스를 이용할 수 있습니다.');
+                  console.log('[PaymentRequired] Reloading page after one-time payment');
+                  window.location.reload();
+                }
               } else {
+                console.error('[PaymentRequired] Payment complete failed:', completeResponse);
                 alert('결제 완료 처리 중 오류가 발생했습니다.');
               }
             } else {
               alert('결제 검증에 실패했습니다.');
             }
           } catch (error: any) {
-            console.error('Payment verification error:', error);
+            console.error('[PaymentRequired] Payment verification error:', error);
             alert('결제 확인 중 오류가 발생했습니다: ' + error.message);
           }
+        } else {
+          // paymentId가 response에 없음
+          console.error('[PaymentRequired] No paymentId in response:', portOneResponse);
+          alert('결제 응답에서 결제 ID를 찾을 수 없습니다.');
         }
       } else {
         // 결제 생성 실패
+        console.error('[PaymentRequired] createPayment failed:', response);
         alert('결제 생성에 실패했습니다. 다시 시도해주세요.');
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('[PaymentRequired] Payment error:', error);
+      console.error('[PaymentRequired] Error details:', error.message, error.code);
       alert('결제 생성 중 오류가 발생했습니다: ' + error.message);
     }
   };

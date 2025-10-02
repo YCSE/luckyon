@@ -234,6 +234,10 @@ export class PaymentService {
         if (payment.paymentType === 'subscription') {
           // 구독 처리 - Transaction 내에서 사용자 문서 업데이트
           const expiresAt = this.calculateSubscriptionExpiry(payment.productType);
+          console.log(`[PaymentService] Updating subscription for user ${payment.uid}:`, {
+            type: payment.productType,
+            expiresAt
+          });
           transaction.update(db.collection('users').doc(payment.uid), {
             currentSubscription: {
               type: payment.productType,
@@ -243,6 +247,7 @@ export class PaymentService {
           });
         } else {
           // 일회성 결제 - oneTimePurchases 배열에 추가
+          console.log(`[PaymentService] Adding one-time purchase for user ${payment.uid}:`, payment.productType);
           transaction.update(db.collection('users').doc(payment.uid), {
             oneTimePurchases: admin.firestore.FieldValue.arrayUnion(payment.productType),
             updatedAt: now

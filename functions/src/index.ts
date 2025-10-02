@@ -133,7 +133,9 @@ export const authVerifyToken = onCall({
         displayName: user.displayName,
         memberGrade: user.memberGrade,
         referralCode: user.referralCode,
-        creditBalance: user.creditBalance
+        creditBalance: user.creditBalance,
+        currentSubscription: user.currentSubscription,
+        oneTimePurchases: user.oneTimePurchases
       }
     };
   } catch (error: any) {

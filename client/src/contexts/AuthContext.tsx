@@ -133,6 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const response: any = await authAPI.verifyToken(idToken);
         if (response.success) {
+          console.log('[AuthContext] User info refreshed:', response.data);
           setUserInfo(response.data);
         }
       } catch (error) {
@@ -153,23 +154,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const checkServiceAccess = (serviceType: string): boolean => {
-    if (!userInfo) return false;
+    console.log('[AuthContext] Checking service access:', {
+      serviceType,
+      userInfo,
+      hasSubscription: !!userInfo?.currentSubscription,
+      oneTimePurchases: userInfo?.oneTimePurchases
+    });
+
+    if (!userInfo) {
+      console.log('[AuthContext] No userInfo, access denied');
+      return false;
+    }
 
     // 구독 확인
     if (userInfo.currentSubscription) {
       const expiresAt = userInfo.currentSubscription.expiresAt instanceof Date
         ? userInfo.currentSubscription.expiresAt
         : new Date(userInfo.currentSubscription.expiresAt);
+      console.log('[AuthContext] Subscription check:', { expiresAt, now: new Date() });
       if (expiresAt > new Date()) {
+        console.log('[AuthContext] Access granted via subscription');
         return true;
       }
     }
 
     // 일회성 구매 확인
     if (userInfo.oneTimePurchases?.includes(serviceType)) {
+      console.log('[AuthContext] Access granted via one-time purchase');
       return true;
     }
 
+    console.log('[AuthContext] Access denied');
     return false;
   };
 
