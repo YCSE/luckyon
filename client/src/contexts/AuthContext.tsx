@@ -30,8 +30,8 @@ interface UserInfo {
   memberGrade: string;
   referralCode: string;
   creditBalance: number;
-  subscription?: {
-    productType: string;
+  currentSubscription?: {
+    type: string;
     expiresAt: Date;
   };
   oneTimePurchases?: string[];
@@ -156,8 +156,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!userInfo) return false;
 
     // 구독 확인
-    if (userInfo.subscription) {
-      const expiresAt = new Date(userInfo.subscription.expiresAt);
+    if (userInfo.currentSubscription) {
+      const expiresAt = userInfo.currentSubscription.expiresAt instanceof Date
+        ? userInfo.currentSubscription.expiresAt
+        : new Date(userInfo.currentSubscription.expiresAt);
       if (expiresAt > new Date()) {
         return true;
       }

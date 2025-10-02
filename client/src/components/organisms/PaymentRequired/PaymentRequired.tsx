@@ -90,11 +90,8 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
                 // 사용자 정보를 갱신하여 결제 권한을 업데이트
                 await refreshUserInfo();
 
-                // refreshUserInfo가 완료된 후에 페이지 새로고침
-                // setTimeout을 사용하여 상태 업데이트가 완료되도록 보장
-                setTimeout(() => {
-                  window.location.reload();
-                }, 100);
+                // 페이지 새로고침 (권한이 업데이트되었으므로)
+                window.location.reload();
               } else {
                 alert('결제 완료 처리 중 오류가 발생했습니다.');
               }

@@ -133,8 +133,8 @@ export class PaymentService {
         createdAt: now
       };
 
-      // merchantUid를 document ID로 사용하여 직접 조회 가능하도록 최적화
-      await db.collection('payments').doc(merchantUid).set(payment);
+      // 결제 문서 생성
+      await db.collection('payments').doc(paymentId).set(payment);
 
       return {
         paymentId,
@@ -155,13 +155,17 @@ export class PaymentService {
    */
   async verifyPayment(data: VerifyPaymentData): Promise<any> {
     try {
-      // 1. 결제 문서 직접 조회 (merchantUid가 document ID이므로 성능 향상)
-      const paymentDoc = await db.collection('payments').doc(data.merchantUid).get();
+      // 1. 결제 문서 조회 (merchantUid로 쿼리)
+      const paymentQuery = await db.collection('payments')
+        .where('merchantUid', '==', data.merchantUid)
+        .limit(1)
+        .get();
 
-      if (!paymentDoc.exists) {
+      if (paymentQuery.empty) {
         throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
       }
 
+      const paymentDoc = paymentQuery.docs[0];
       const payment = paymentDoc.data() as Payment;
 
       // 2. PortOne API 호출하여 검증
@@ -205,14 +209,18 @@ export class PaymentService {
     try {
       // Transaction을 사용하여 동시성 제어 및 원자성 보장
       const result = await db.runTransaction(async (transaction) => {
-        // 1. 결제 문서 직접 조회 (merchantUid가 document ID이므로 성능 향상)
-        const paymentRef = db.collection('payments').doc(merchantUid);
-        const paymentDoc = await transaction.get(paymentRef);
+        // 1. 결제 문서 조회 (merchantUid로 쿼리)
+        const paymentQuery = await db.collection('payments')
+          .where('merchantUid', '==', merchantUid)
+          .limit(1)
+          .get();
 
-        if (!paymentDoc.exists) {
+        if (paymentQuery.empty) {
           throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
         }
 
+        const paymentDoc = paymentQuery.docs[0];
+        const paymentRef = paymentDoc.ref;
         const payment = paymentDoc.data() as Payment;
 
         // 2. 중복 처리 방지
