@@ -116,7 +116,7 @@ export class PaymentService {
         }
       }
 
-      // 5. 결제 문서 생성
+      // 5. 결제 문서 생성 (merchantUid를 document ID로 사용하여 성능 최적화)
       const now = Timestamp.now();
       const payment: Payment = {
         paymentId,
@@ -133,7 +133,8 @@ export class PaymentService {
         createdAt: now
       };
 
-      await db.collection('payments').doc(paymentId).set(payment);
+      // merchantUid를 document ID로 사용하여 직접 조회 가능하도록 최적화
+      await db.collection('payments').doc(merchantUid).set(payment);
 
       return {
         paymentId,
@@ -154,17 +155,13 @@ export class PaymentService {
    */
   async verifyPayment(data: VerifyPaymentData): Promise<any> {
     try {
-      // 1. 결제 문서 조회
-      const paymentQuery = await db.collection('payments')
-        .where('merchantUid', '==', data.merchantUid)
-        .limit(1)
-        .get();
+      // 1. 결제 문서 직접 조회 (merchantUid가 document ID이므로 성능 향상)
+      const paymentDoc = await db.collection('payments').doc(data.merchantUid).get();
 
-      if (paymentQuery.empty) {
+      if (!paymentDoc.exists) {
         throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
       }
 
-      const paymentDoc = paymentQuery.docs[0];
       const payment = paymentDoc.data() as Payment;
 
       // 2. PortOne API 호출하여 검증
@@ -206,54 +203,63 @@ export class PaymentService {
    */
   async completePayment(impUid: string, merchantUid: string): Promise<any> {
     try {
-      // 1. 결제 문서 조회
-      const paymentQuery = await db.collection('payments')
-        .where('merchantUid', '==', merchantUid)
-        .limit(1)
-        .get();
+      // Transaction을 사용하여 동시성 제어 및 원자성 보장
+      const result = await db.runTransaction(async (transaction) => {
+        // 1. 결제 문서 직접 조회 (merchantUid가 document ID이므로 성능 향상)
+        const paymentRef = db.collection('payments').doc(merchantUid);
+        const paymentDoc = await transaction.get(paymentRef);
 
-      if (paymentQuery.empty) {
-        throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
-      }
+        if (!paymentDoc.exists) {
+          throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
+        }
 
-      const paymentDoc = paymentQuery.docs[0];
-      const payment = paymentDoc.data() as Payment;
+        const payment = paymentDoc.data() as Payment;
 
-      // 2. 중복 처리 방지
-      if (payment.status === 'completed') {
-        throw new AppError(ErrorCode.PAY002, '이미 처리된 결제입니다.');
-      }
+        // 2. 중복 처리 방지
+        if (payment.status === 'completed') {
+          throw new AppError(ErrorCode.PAY002, '이미 처리된 결제입니다.');
+        }
 
-      const now = Timestamp.now();
+        const now = Timestamp.now();
 
-      // 3. 결제 타입에 따른 처리
-      if (payment.paymentType === 'subscription') {
-        // 구독 처리
-        await this.processSubscription(payment.uid, payment.productType, now);
-      } else {
-        // 일회성 결제 - oneTimePurchases 배열에 추가
-        await db.collection('users').doc(payment.uid).update({
-          oneTimePurchases: admin.firestore.FieldValue.arrayUnion(payment.productType),
+        // 3. 결제 타입에 따른 처리
+        if (payment.paymentType === 'subscription') {
+          // 구독 처리 - Transaction 내에서 사용자 문서 업데이트
+          const expiresAt = this.calculateSubscriptionExpiry(payment.productType);
+          transaction.update(db.collection('users').doc(payment.uid), {
+            currentSubscription: {
+              type: payment.productType,
+              expiresAt
+            },
+            updatedAt: now
+          });
+        } else {
+          // 일회성 결제 - oneTimePurchases 배열에 추가
+          transaction.update(db.collection('users').doc(payment.uid), {
+            oneTimePurchases: admin.firestore.FieldValue.arrayUnion(payment.productType),
+            updatedAt: now
+          });
+        }
+
+        // 4. 결제 상태 업데이트
+        transaction.update(paymentRef, {
+          impUid,
+          status: 'completed',
+          completedAt: now,
           updatedAt: now
         });
-      }
 
-      // 4. 결제 상태 업데이트
-      await db.collection('payments').doc(paymentDoc.id).update({
-        impUid,
-        status: 'completed',
-        completedAt: now,
-        updatedAt: now
+        // 5. 리퍼럴 크레딧 처리는 트리거가 자동 처리
+
+        return {
+          success: true,
+          paymentId: payment.paymentId,
+          paymentType: payment.paymentType,
+          productType: payment.productType
+        };
       });
 
-      // 5. 리퍼럴 크레딧 처리는 트리거가 자동 처리
-
-      return {
-        success: true,
-        paymentId: payment.paymentId,
-        paymentType: payment.paymentType,
-        productType: payment.productType
-      };
+      return result;
     } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
@@ -263,9 +269,9 @@ export class PaymentService {
   }
 
   /**
-   * 구독 처리
+   * 구독 만료일 계산
    */
-  private async processSubscription(uid: string, productType: string, now: Timestamp): Promise<void> {
+  private calculateSubscriptionExpiry(productType: string): Timestamp {
     let days = 0;
     switch (productType) {
       case '1day': days = 1; break;
@@ -275,15 +281,7 @@ export class PaymentService {
         throw new AppError(ErrorCode.SVC003, '유효하지 않은 구독 상품입니다.');
     }
 
-    const expiresAt = Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
-
-    await db.collection('users').doc(uid).update({
-      currentSubscription: {
-        type: productType,
-        expiresAt
-      },
-      updatedAt: now
-    });
+    return Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 
   /**

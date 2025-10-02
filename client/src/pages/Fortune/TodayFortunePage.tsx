@@ -10,6 +10,7 @@ import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { DateInput } from '../../components/atoms/DateInput';
 import { PaymentRequired } from '../../components/organisms/PaymentRequired';
+import { SERVICE_PRICES, SERVICE_NAMES, SERVICE_DESCRIPTIONS } from '../../constants/pricing';
 
 const Container = styled.div`
   max-width: 800px;
@@ -123,10 +124,10 @@ export const TodayFortunePage: React.FC = () => {
   if (!checkServiceAccess('today')) {
     return (
       <PaymentRequired
-        serviceName="오늘의 운세"
+        serviceName={SERVICE_NAMES.today}
         productType="today"
-        oneTimePrice={3900}
-        oneTimeDescription="당일 운세를 확인하세요"
+        oneTimePrice={SERVICE_PRICES.today}
+        oneTimeDescription={SERVICE_DESCRIPTIONS.today}
         oneTimeFeatures={['6시간 캐시', '종합운/사랑운/재물운/건강운']}
       />
     );

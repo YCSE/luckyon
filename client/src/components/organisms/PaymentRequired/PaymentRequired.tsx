@@ -9,6 +9,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { paymentAPI } from '../../../services/api';
 import { PricingCard } from '../PricingCard/PricingCard';
 import { tokens } from '../../../design-system/tokens';
+import { SUBSCRIPTION_PLANS } from '../../../constants/pricing';
 
 interface PaymentRequiredProps {
   serviceName: string;
@@ -115,30 +116,6 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
     }
   };
 
-  const subscriptionPlans = [
-    {
-      title: '1일 이용권',
-      price: 9900,
-      description: '24시간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '24시간 이용', '영구 보관'],
-      productType: '1day'
-    },
-    {
-      title: '7일 이용권',
-      price: 39000,
-      description: '7일간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '7일간 이용', '영구 보관', '약 44% 할인'],
-      productType: '7days'
-    },
-    {
-      title: '30일 이용권',
-      price: 99000,
-      description: '한 달간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '30일간 이용', '영구 보관', '약 67% 할인'],
-      productType: '30days'
-    }
-  ];
-
   return (
     <PageWrapper>
       <Container>
@@ -161,7 +138,7 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
 
         <SectionTitle>모든 서비스 이용 (추천)</SectionTitle>
         <SubscriptionSection>
-          {subscriptionPlans.map((plan) => (
+          {SUBSCRIPTION_PLANS.map((plan) => (
             <PricingCard
               key={plan.productType}
               title={plan.title}
@@ -170,6 +147,7 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
               features={plan.features}
               productType={plan.productType}
               paymentType="subscription"
+              recommended={plan.recommended}
               onPurchase={() => handlePurchase(plan.productType, plan.price, 'subscription')}
             />
           ))}

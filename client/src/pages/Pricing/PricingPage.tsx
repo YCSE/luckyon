@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { paymentAPI } from '../../services/api';
 import { PricingCard } from '../../components/organisms/PricingCard/PricingCard';
 import { tokens } from '../../design-system/tokens';
+import { SUBSCRIPTION_PLANS, ONE_TIME_PLANS } from '../../constants/pricing';
 
 const Container = styled.div`
   max-width: 1200px;
@@ -186,76 +187,6 @@ export const PricingPage: React.FC = () => {
     }
   };
 
-  const subscriptionPlans = [
-    {
-      title: '1일 이용권',
-      price: 9900,
-      description: '24시간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '24시간 이용', '영구 보관'],
-      productType: '1day'
-    },
-    {
-      title: '7일 이용권',
-      price: 39000,
-      description: '7일간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '7일간 이용', '영구 보관', '약 44% 할인'],
-      productType: '7days',
-      recommended: true
-    },
-    {
-      title: '30일 이용권',
-      price: 99000,
-      description: '한 달간 모든 서비스 무제한 이용',
-      features: ['모든 운세 서비스 무제한', '30일간 이용', '영구 보관', '약 67% 할인'],
-      productType: '30days'
-    }
-  ];
-
-  const oneTimePlans = [
-    {
-      title: '오늘의 운세',
-      price: 3900,
-      description: '당일 운세를 확인하세요',
-      features: ['종합운/사랑운/재물운/건강운'],
-      productType: 'today'
-    },
-    {
-      title: '사주팔자',
-      price: 9900,
-      description: '평생 사주를 분석합니다',
-      features: ['생시 기반 정밀 분석', '사주 해석'],
-      productType: 'saju'
-    },
-    {
-      title: '토정비결',
-      price: 7900,
-      description: '한 해의 운세를 봅니다',
-      features: ['연간 운세', '월별 운세'],
-      productType: 'tojung'
-    },
-    {
-      title: '궁합',
-      price: 12900,
-      description: '두 사람의 궁합을 봅니다',
-      features: ['사랑 궁합', '결혼 궁합'],
-      productType: 'compatibility'
-    },
-    {
-      title: '재물운',
-      price: 5900,
-      description: '금전 운세를 봅니다',
-      features: ['직업별 맞춤 분석', '투자운'],
-      productType: 'wealth'
-    },
-    {
-      title: '연애운',
-      price: 6900,
-      description: '연애 운세를 봅니다',
-      features: ['상태별 맞춤 분석', '이상형 분석'],
-      productType: 'love'
-    }
-  ];
-
   return (
     <Container>
       <Title>요금제 선택</Title>
@@ -273,7 +204,7 @@ export const PricingPage: React.FC = () => {
 
       {activeTab === 'subscription' ? (
         <CardGrid>
-          {subscriptionPlans.map((plan) => (
+          {SUBSCRIPTION_PLANS.map((plan) => (
             <PricingCard
               key={plan.productType}
               title={plan.title}
@@ -289,7 +220,7 @@ export const PricingPage: React.FC = () => {
         </CardGrid>
       ) : (
         <ServiceGrid>
-          {oneTimePlans.map((plan) => (
+          {ONE_TIME_PLANS.map((plan) => (
             <PricingCard
               key={plan.productType}
               title={plan.title}
