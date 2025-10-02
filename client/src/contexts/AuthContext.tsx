@@ -19,6 +19,7 @@ interface AuthContextType {
   signup: (data: SignupData) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  checkServiceAccess: (serviceType: string) => boolean;
 }
 
 interface UserInfo {
@@ -28,6 +29,11 @@ interface UserInfo {
   memberGrade: string;
   referralCode: string;
   creditBalance: number;
+  subscription?: {
+    productType: string;
+    expiresAt: Date;
+  };
+  oneTimePurchases?: string[];
 }
 
 interface SignupData {
@@ -131,13 +137,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const checkServiceAccess = (serviceType: string): boolean => {
+    if (!userInfo) return false;
+
+    // 구독 확인
+    if (userInfo.subscription) {
+      const expiresAt = new Date(userInfo.subscription.expiresAt);
+      if (expiresAt > new Date()) {
+        return true;
+      }
+    }
+
+    // 일회성 구매 확인
+    if (userInfo.oneTimePurchases?.includes(serviceType)) {
+      return true;
+    }
+
+    return false;
+  };
+
   const value: AuthContextType = {
     user,
     userInfo,
     loading,
     signup,
     login,
-    logout
+    logout,
+    checkServiceAccess
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

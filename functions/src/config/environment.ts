@@ -5,7 +5,7 @@
 
 // 환경변수를 직접 export (defineString 대신 process.env 사용)
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-export const PORTONE_IMP_CODE = process.env.PORTONE_IMP_CODE || '';
+export const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
 export const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET || '';
 export const FUNCTIONS_REGION = process.env.FUNCTIONS_REGION || 'asia-northeast3';
 
@@ -13,7 +13,7 @@ export const FUNCTIONS_REGION = process.env.FUNCTIONS_REGION || 'asia-northeast3
 export const validateEnvironment = (): boolean => {
   const required = [
     { name: 'GEMINI_API_KEY', value: GEMINI_API_KEY },
-    { name: 'PORTONE_IMP_CODE', value: PORTONE_IMP_CODE },
+    { name: 'PORTONE_STORE_ID', value: PORTONE_STORE_ID },
     { name: 'PORTONE_API_SECRET', value: PORTONE_API_SECRET }
   ];
 

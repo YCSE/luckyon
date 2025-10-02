@@ -9,6 +9,7 @@ import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { DateInput } from '../../components/atoms/DateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -69,7 +70,7 @@ const SectionTitle = styled.h3`
 `;
 
 export const CompatibilityPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [partnerName, setPartnerName] = useState('');
@@ -97,6 +98,19 @@ export const CompatibilityPage: React.FC = () => {
 
   if (!user) {
     return <Container><Title>로그인이 필요합니다</Title></Container>;
+  }
+
+  // 결제 확인
+  if (!checkServiceAccess('compatibility')) {
+    return (
+      <PaymentRequired
+        serviceName="궁합"
+        productType="compatibility"
+        oneTimePrice={12900}
+        oneTimeDescription="두 사람의 궁합을 봅니다"
+        oneTimeFeatures={['7일 캐시', '사랑 궁합', '결혼 궁합']}
+      />
+    );
   }
 
   return (

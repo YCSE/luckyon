@@ -9,7 +9,7 @@ import { ErrorCode, SUBSCRIPTION_PRICES, SERVICE_PRICES } from '../config/consta
 import { generateMerchantUid, generatePaymentId } from '../utils/helpers';
 import { Payment } from '../types';
 import { Timestamp } from 'firebase-admin/firestore';
-import { PORTONE_IMP_CODE, PORTONE_API_SECRET } from '../config/environment';
+import { PORTONE_STORE_ID, PORTONE_API_SECRET } from '../config/environment';
 
 interface CreatePaymentData {
   uid: string;
@@ -23,16 +23,17 @@ interface VerifyPaymentData {
   merchantUid: string;
 }
 
-interface PortOneResponse {
-  code: number;
-  message: string;
-  response: {
-    imp_uid: string;
-    merchant_uid: string;
-    amount: number;
-    status: string;
-    paid_at: number;
+// PortOne V2 Response 타입
+interface PortOneV2PaymentResponse {
+  id: string;
+  storeId: string;
+  orderName: string;
+  amount: {
+    total: number;
+    currency: string;
   };
+  status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED';
+  paidAt?: string;
 }
 
 export class PaymentService {
@@ -168,9 +169,10 @@ export class PaymentService {
       // 2. PortOne API 호출하여 검증
       const portOneData = await this.getPortOnePayment(data.impUid);
 
-      // 3. merchantUid 일치 확인
-      if (portOneData.merchant_uid !== data.merchantUid) {
-        throw new AppError(ErrorCode.PAY001, 'merchantUid가 일치하지 않습니다.');
+      // 3. paymentId(imp_uid) 일치 확인
+      // V2에서는 우리가 지정한 merchantUid가 payment ID로 사용됨
+      if (portOneData.imp_uid !== data.merchantUid) {
+        throw new AppError(ErrorCode.PAY001, 'paymentId가 일치하지 않습니다.');
       }
 
       // 4. 금액 일치 확인
@@ -184,7 +186,7 @@ export class PaymentService {
       }
 
       return {
-        valid: true,
+        success: true,
         impUid: data.impUid,
         merchantUid: data.merchantUid,
         amount: portOneData.amount,
@@ -280,47 +282,35 @@ export class PaymentService {
   }
 
   /**
-   * PortOne API에서 결제 정보 조회
+   * PortOne V2 API에서 결제 정보 조회
    */
-  private async getPortOnePayment(impUid: string): Promise<any> {
+  private async getPortOnePayment(paymentId: string): Promise<any> {
     try {
-      const impCode = PORTONE_IMP_CODE;
+      const storeId = PORTONE_STORE_ID;
       const apiSecret = PORTONE_API_SECRET;
 
-      if (!impCode || !apiSecret) {
+      if (!storeId || !apiSecret) {
         throw new AppError(ErrorCode.SYS002, 'PortOne API 설정이 누락되었습니다.');
       }
 
-      // 1. Access Token 발급
-      const tokenResponse = await axios.post<PortOneResponse>(
-        'https://api.iamport.kr/users/getToken',
-        {
-          imp_key: impCode,
-          imp_secret: apiSecret
-        }
-      );
-
-      if (tokenResponse.data.code !== 0) {
-        throw new Error('PortOne 토큰 발급 실패');
-      }
-
-      const accessToken = tokenResponse.data.response;
-
-      // 2. 결제 정보 조회
-      const paymentResponse = await axios.get<PortOneResponse>(
-        `https://api.iamport.kr/payments/${impUid}`,
+      // PortOne V2 API: 토큰 발급 없이 직접 인증
+      const paymentResponse = await axios.get<PortOneV2PaymentResponse>(
+        `https://api.portone.io/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`
+            Authorization: `PortOne ${apiSecret}`,
+            'Content-Type': 'application/json'
           }
         }
       );
 
-      if (paymentResponse.data.code !== 0) {
-        throw new Error('PortOne 결제 정보 조회 실패');
-      }
-
-      return paymentResponse.data.response;
+      // V2 응답: id가 우리의 merchantUid (우리가 paymentId로 지정했으므로)
+      return {
+        imp_uid: paymentResponse.data.id,
+        amount: paymentResponse.data.amount.total,
+        status: paymentResponse.data.status === 'PAID' ? 'paid' : paymentResponse.data.status.toLowerCase(),
+        paid_at: paymentResponse.data.paidAt ? new Date(paymentResponse.data.paidAt).getTime() / 1000 : undefined
+      };
     } catch (error: any) {
       throw new AppError(ErrorCode.SYS002, `PortOne API 오류: ${error.message}`);
     }

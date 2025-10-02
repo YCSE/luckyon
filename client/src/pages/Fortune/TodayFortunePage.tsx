@@ -9,6 +9,7 @@ import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { DateInput } from '../../components/atoms/DateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -79,7 +80,7 @@ const LoadingMessage = styled.div`
 `;
 
 export const TodayFortunePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -115,6 +116,19 @@ export const TodayFortunePage: React.FC = () => {
           오늘의 운세를 확인하려면 먼저 로그인해주세요.
         </p>
       </Container>
+    );
+  }
+
+  // 결제 확인
+  if (!checkServiceAccess('today')) {
+    return (
+      <PaymentRequired
+        serviceName="오늘의 운세"
+        productType="today"
+        oneTimePrice={3900}
+        oneTimeDescription="당일 운세를 확인하세요"
+        oneTimeFeatures={['6시간 캐시', '종합운/사랑운/재물운/건강운']}
+      />
     );
   }
 

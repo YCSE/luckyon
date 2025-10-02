@@ -9,6 +9,7 @@ import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { DateInput } from '../../components/atoms/DateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -68,7 +69,7 @@ const ErrorMessage = styled.div`
 `;
 
 export const SajuPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [birthTime, setBirthTime] = useState('');
@@ -98,6 +99,19 @@ export const SajuPage: React.FC = () => {
       <Container>
         <Title>로그인이 필요합니다</Title>
       </Container>
+    );
+  }
+
+  // 결제 확인
+  if (!checkServiceAccess('saju')) {
+    return (
+      <PaymentRequired
+        serviceName="사주팔자"
+        productType="saju"
+        oneTimePrice={9900}
+        oneTimeDescription="평생 사주를 분석합니다"
+        oneTimeFeatures={['30일 캐시', '생시 기반 정밀 분석', '사주 해석']}
+      />
     );
   }
 

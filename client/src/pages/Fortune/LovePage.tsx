@@ -9,6 +9,7 @@ import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
 import { DateInput } from '../../components/atoms/DateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -77,7 +78,7 @@ const ErrorMessage = styled.div`
 `;
 
 export const LovePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
@@ -105,6 +106,19 @@ export const LovePage: React.FC = () => {
 
   if (!user) {
     return <Container><Title>로그인이 필요합니다</Title></Container>;
+  }
+
+  // 결제 확인
+  if (!checkServiceAccess('love')) {
+    return (
+      <PaymentRequired
+        serviceName="연애운"
+        productType="love"
+        oneTimePrice={6900}
+        oneTimeDescription="연애 운세를 봅니다"
+        oneTimeFeatures={['24시간 캐시', '상태별 맞춤 분석', '이상형 분석']}
+      />
+    );
   }
 
   return (

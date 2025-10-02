@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 // Pages
 import { HomePage } from './pages/Home/HomePage';
 import { LoginPage } from './pages/Auth/LoginPage';
+import { MyPage } from './pages/MyPage/MyPage';
 import { TodayFortunePage } from './pages/Fortune/TodayFortunePage';
 import { SajuPage } from './pages/Fortune/SajuPage';
 import { TojungPage } from './pages/Fortune/TojungPage';
@@ -91,6 +92,16 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <PricingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* MyPage Route */}
+          <Route
+            path="/mypage"
+            element={
+              <ProtectedRoute>
+                <MyPage />
               </ProtectedRoute>
             }
           />
