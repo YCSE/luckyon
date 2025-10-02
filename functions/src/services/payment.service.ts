@@ -171,8 +171,8 @@ export class PaymentService {
       const portOneData = await this.getPortOnePayment(data.impUid);
 
       // 3. paymentId(imp_uid) 일치 확인
-      // V2에서는 우리가 지정한 merchantUid가 payment ID로 사용됨
-      if (portOneData.imp_uid !== data.merchantUid) {
+      // portOneData.imp_uid는 PortOne V2의 payment ID이며, 이를 data.impUid와 비교해야 함
+      if (portOneData.imp_uid !== data.impUid) {
         throw new AppError(ErrorCode.PAY001, 'paymentId가 일치하지 않습니다.');
       }
 

@@ -98,7 +98,6 @@ export const PricingPage: React.FC = () => {
         const { merchantUid, productName, amount: paymentAmount } = response.data;
 
         // 2. PortOne V2 결제창 호출
-        console.log('결제창 호출 시작:', { merchantUid, productName, paymentAmount });
         const portOneResponse = await PortOne.requestPayment({
           storeId: import.meta.env.VITE_PORTONE_STORE_ID,
           channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY,
@@ -113,12 +112,9 @@ export const PricingPage: React.FC = () => {
           }
         });
 
-        console.log('PortOne 응답:', portOneResponse);
-
         // 3. 결제 결과 처리
         // 사용자가 결제를 취소한 경우
         if (portOneResponse === undefined) {
-          console.log('결제가 취소되었습니다.');
           alert('결제가 취소되었습니다.');
           return;
         }
@@ -132,15 +128,12 @@ export const PricingPage: React.FC = () => {
 
         // 4. 결제 성공 - 검증 및 완료 처리
         // PaymentResponse 타입에 따르면 paymentId는 항상 존재
-        console.log('결제 성공 - 검증 시작:', portOneResponse.paymentId);
         try {
           // 4-1. 결제 검증
           const verifyResponse: any = await paymentAPI.verify(
             portOneResponse.paymentId,
             merchantUid
           );
-
-          console.log('검증 응답:', verifyResponse);
 
           if (verifyResponse.success) {
             // 4-2. 결제 완료 처리
@@ -149,15 +142,11 @@ export const PricingPage: React.FC = () => {
               merchantUid
             );
 
-            console.log('완료 응답:', completeResponse);
-
             if (completeResponse.success) {
-              console.log('결제 완료 성공:', { paymentType, productType });
 
               // 결제 타입에 따라 적절한 페이지로 이동
               if (paymentType === 'subscription') {
                 // 구독: 모든 서비스 이용 가능하므로 홈으로
-                console.log('구독 결제 완료 - 홈으로 이동');
                 alert('결제가 완료되었습니다! 홈으로 이동합니다.');
                 setTimeout(() => {
                   window.location.href = '/';
@@ -173,7 +162,6 @@ export const PricingPage: React.FC = () => {
                   love: '/fortune/love'
                 };
                 const targetRoute = serviceRoutes[productType] || '/';
-                console.log('일회성 결제 완료 - 서비스 페이지로 이동:', targetRoute);
                 alert(`결제가 완료되었습니다! ${targetRoute}로 이동합니다.`);
                 setTimeout(() => {
                   window.location.href = targetRoute;

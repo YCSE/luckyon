@@ -86,17 +86,14 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
               if (completeResponse.success) {
                 alert('결제가 완료되었습니다!');
 
-                // 디버깅
-                console.log('결제 완료 - paymentType:', paymentType);
-                console.log('결제 완료 - purchaseProductType:', purchaseProductType);
-                console.log('현재 페이지:', window.location.pathname);
-
                 // 사용자 정보를 갱신하여 결제 권한을 업데이트
                 await refreshUserInfo();
 
-                // 페이지 새로고침 (결제 권한이 업데이트되었으므로)
-                // 서비스 페이지에서는 새로고침하면 권한이 확인되어 서비스가 표시됨
-                window.location.reload();
+                // refreshUserInfo가 완료된 후에 페이지 새로고침
+                // setTimeout을 사용하여 상태 업데이트가 완료되도록 보장
+                setTimeout(() => {
+                  window.location.reload();
+                }, 100);
               } else {
                 alert('결제 완료 처리 중 오류가 발생했습니다.');
               }
@@ -108,6 +105,9 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
             alert('결제 확인 중 오류가 발생했습니다: ' + error.message);
           }
         }
+      } else {
+        // 결제 생성 실패
+        alert('결제 생성에 실패했습니다. 다시 시도해주세요.');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
