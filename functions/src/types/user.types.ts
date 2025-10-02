@@ -27,6 +27,7 @@ export interface User {
   creditBalance: number;
   bankAccount?: BankAccount;
   currentSubscription?: CurrentSubscription;
+  oneTimePurchases?: string[];  // 일회성 구매한 서비스 목록
   serviceUsage: Record<string, number>;
   createdAt: Timestamp;
   updatedAt: Timestamp;

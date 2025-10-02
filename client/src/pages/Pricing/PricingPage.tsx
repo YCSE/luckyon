@@ -153,13 +153,15 @@ export const PricingPage: React.FC = () => {
 
             if (completeResponse.success) {
               console.log('결제 완료 성공:', { paymentType, productType });
-              alert('결제가 완료되었습니다!');
 
               // 결제 타입에 따라 적절한 페이지로 이동
               if (paymentType === 'subscription') {
                 // 구독: 모든 서비스 이용 가능하므로 홈으로
                 console.log('구독 결제 완료 - 홈으로 이동');
-                window.location.href = '/';
+                alert('결제가 완료되었습니다! 홈으로 이동합니다.');
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 100);
               } else {
                 // 일회성: 해당 서비스 페이지로 이동
                 const serviceRoutes: Record<string, string> = {
@@ -172,7 +174,10 @@ export const PricingPage: React.FC = () => {
                 };
                 const targetRoute = serviceRoutes[productType] || '/';
                 console.log('일회성 결제 완료 - 서비스 페이지로 이동:', targetRoute);
-                window.location.href = targetRoute;
+                alert(`결제가 완료되었습니다! ${targetRoute}로 이동합니다.`);
+                setTimeout(() => {
+                  window.location.href = targetRoute;
+                }, 100);
               }
             } else {
               console.error('결제 완료 처리 실패:', completeResponse);

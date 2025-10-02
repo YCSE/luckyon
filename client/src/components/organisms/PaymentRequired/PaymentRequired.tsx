@@ -25,7 +25,7 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
   oneTimeDescription,
   oneTimeFeatures
 }) => {
-  const { user } = useAuth();
+  const { user, refreshUserInfo } = useAuth();
 
   const handlePurchase = async (
     purchaseProductType: string,
@@ -85,6 +85,17 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
 
               if (completeResponse.success) {
                 alert('결제가 완료되었습니다!');
+
+                // 디버깅
+                console.log('결제 완료 - paymentType:', paymentType);
+                console.log('결제 완료 - purchaseProductType:', purchaseProductType);
+                console.log('현재 페이지:', window.location.pathname);
+
+                // 사용자 정보를 갱신하여 결제 권한을 업데이트
+                await refreshUserInfo();
+
+                // 페이지 새로고침 (결제 권한이 업데이트되었으므로)
+                // 서비스 페이지에서는 새로고침하면 권한이 확인되어 서비스가 표시됨
                 window.location.reload();
               } else {
                 alert('결제 완료 처리 중 오류가 발생했습니다.');

@@ -3,6 +3,7 @@
  * 결제 생성, 검증, 완료 처리
  */
 import axios from 'axios';
+import * as admin from 'firebase-admin';
 import { db } from '../config/firebase';
 import { AppError } from '../utils/errors';
 import { ErrorCode, SUBSCRIPTION_PRICES, SERVICE_PRICES } from '../config/constants';
@@ -230,7 +231,11 @@ export class PaymentService {
         // 구독 처리
         await this.processSubscription(payment.uid, payment.productType, now);
       } else {
-        // 일회성 결제는 별도 처리 불필요 (운세 생성 시 결제 확인)
+        // 일회성 결제 - oneTimePurchases 배열에 추가
+        await db.collection('users').doc(payment.uid).update({
+          oneTimePurchases: admin.firestore.FieldValue.arrayUnion(payment.productType),
+          updatedAt: now
+        });
       }
 
       // 4. 결제 상태 업데이트

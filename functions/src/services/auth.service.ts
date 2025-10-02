@@ -86,6 +86,7 @@ export class AuthService {
         referredBy,
         referredUsers: [],
         creditBalance: 0,
+        oneTimePurchases: [],
         serviceUsage: {
           today: 0,
           saju: 0,

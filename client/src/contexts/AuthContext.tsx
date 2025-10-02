@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkServiceAccess: (serviceType: string) => boolean;
+  refreshUserInfo: () => Promise<void>;
 }
 
 interface UserInfo {
@@ -126,6 +127,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const refreshUserInfo = async () => {
+    if (user) {
+      const idToken = await user.getIdToken(true); // force refresh
+      try {
+        const response: any = await authAPI.verifyToken(idToken);
+        if (response.success) {
+          setUserInfo(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to refresh user info:', error);
+      }
+    }
+  };
+
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
@@ -163,7 +178,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     login,
     logout,
-    checkServiceAccess
+    checkServiceAccess,
+    refreshUserInfo
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
