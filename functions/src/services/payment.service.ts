@@ -20,7 +20,7 @@ interface CreatePaymentData {
 }
 
 interface VerifyPaymentData {
-  impUid: string;
+  paymentId: string;  // PortOne V2 paymentId (우리가 요청 시 보낸 merchantUid)
   merchantUid: string;
 }
 
@@ -169,8 +169,8 @@ export class PaymentService {
       const payment = paymentDoc.data() as Payment;
 
       // 2. PortOne API 호출하여 결제 상태 조회
-      // impUid는 클라이언트가 보낸 paymentId (우리의 merchantUid)
-      const portOnePayment = await this.getPortOnePayment(data.impUid);
+      // paymentId는 클라이언트가 PortOne SDK로부터 받은 응답 (우리의 merchantUid와 동일)
+      const portOnePayment = await this.getPortOnePayment(data.paymentId);
 
       // 3. paymentId 일치 확인
       // PortOne V2: 우리가 보낸 paymentId(merchantUid)가 응답의 id 필드에 그대로 반환됨
@@ -178,7 +178,7 @@ export class PaymentService {
         console.error('[PaymentService] Payment ID mismatch:', {
           expected: data.merchantUid,
           received: portOnePayment.id,
-          impUid: data.impUid
+          paymentId: data.paymentId
         });
         throw new AppError(ErrorCode.PAY001, 'paymentId가 일치하지 않습니다.');
       }
@@ -219,7 +219,7 @@ export class PaymentService {
 
       return {
         success: true,
-        impUid: data.impUid,
+        paymentId: data.paymentId,
         merchantUid: data.merchantUid,
         amount: portOnePayment.amount,
         status: portOnePayment.status
@@ -236,7 +236,7 @@ export class PaymentService {
   /**
    * 결제 완료 처리
    */
-  async completePayment(impUid: string, merchantUid: string): Promise<any> {
+  async completePayment(paymentId: string, merchantUid: string): Promise<any> {
     try {
       // Transaction을 사용하여 동시성 제어 및 원자성 보장
       const result = await db.runTransaction(async (transaction) => {
@@ -287,7 +287,7 @@ export class PaymentService {
 
         // 4. 결제 상태 업데이트
         transaction.update(paymentRef, {
-          impUid,
+          impUid: paymentId,  // PortOne V2 paymentId를 impUid 필드에 저장 (기존 스키마 호환성)
           status: 'completed',
           completedAt: now,
           updatedAt: now

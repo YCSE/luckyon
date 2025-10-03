@@ -66,7 +66,7 @@ export interface VerifyPaymentResponse {
   success: boolean;
   data: {
     success: boolean;
-    impUid: string;
+    paymentId: string;
     merchantUid: string;
     amount: number;
     status: string;
@@ -151,15 +151,15 @@ export const paymentAPI = {
     return result.data as CreatePaymentResponse;
   },
 
-  verify: async (impUid: string, merchantUid: string): Promise<VerifyPaymentResponse> => {
+  verify: async (paymentId: string, merchantUid: string): Promise<VerifyPaymentResponse> => {
     const fn = httpsCallable(functions, 'verifyPayment');
-    const result = await fn({ impUid, merchantUid });
+    const result = await fn({ paymentId, merchantUid });
     return result.data as VerifyPaymentResponse;
   },
 
-  complete: async (impUid: string, merchantUid: string): Promise<CompletePaymentResponse> => {
+  complete: async (paymentId: string, merchantUid: string): Promise<CompletePaymentResponse> => {
     const fn = httpsCallable(functions, 'completePayment');
-    const result = await fn({ impUid, merchantUid });
+    const result = await fn({ paymentId, merchantUid });
     return result.data as CompletePaymentResponse;
   }
 };

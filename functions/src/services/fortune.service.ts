@@ -105,14 +105,15 @@ export class FortuneService {
    * 캐시 키 생성
    */
   private generateCacheKey(serviceType: ServiceType, inputData: FortuneRequestData): string {
-    const parts = [serviceType, inputData.name, inputData.birthDate];
+    const parts = [serviceType, inputData.name.trim(), inputData.birthDate.trim()];
 
-    if (inputData.birthTime) parts.push(inputData.birthTime);
-    if (inputData.partnerName) parts.push(inputData.partnerName);
-    if (inputData.partnerBirthDate) parts.push(inputData.partnerBirthDate);
+    // Only add non-empty trimmed values to prevent cache key variations
+    if (inputData.birthTime?.trim()) parts.push(inputData.birthTime.trim());
+    if (inputData.partnerName?.trim()) parts.push(inputData.partnerName.trim());
+    if (inputData.partnerBirthDate?.trim()) parts.push(inputData.partnerBirthDate.trim());
     if (inputData.gender) parts.push(inputData.gender);
     if (inputData.relationshipStatus) parts.push(inputData.relationshipStatus);
-    if (inputData.jobType) parts.push(inputData.jobType);
+    if (inputData.jobType?.trim()) parts.push(inputData.jobType.trim());
     if (inputData.lunarCalendar !== undefined) parts.push(String(inputData.lunarCalendar));
 
     return parts.join('|');

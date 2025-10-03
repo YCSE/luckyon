@@ -254,7 +254,7 @@ export const createPayment = onCall({
 
 /**
  * 결제 검증
- * @param impUid - PortOne 결제 고유번호
+ * @param paymentId - PortOne V2 결제 ID (PortOne SDK 응답의 paymentId)
  * @param merchantUid - 가맹점 주문번호
  */
 export const verifyPayment = onCall({
@@ -263,14 +263,14 @@ export const verifyPayment = onCall({
   concurrency: 80
 }, async (request) => {
   try {
-    const { impUid, merchantUid } = request.data;
+    const { paymentId, merchantUid } = request.data;
 
-    if (!impUid || !merchantUid) {
+    if (!paymentId || !merchantUid) {
       throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
     }
 
     const result = await paymentService.verifyPayment({
-      impUid,
+      paymentId,
       merchantUid
     });
 
@@ -286,7 +286,7 @@ export const verifyPayment = onCall({
 
 /**
  * 결제 완료 처리
- * @param impUid - PortOne 결제 고유번호
+ * @param paymentId - PortOne V2 결제 ID (PortOne SDK 응답의 paymentId)
  * @param merchantUid - 가맹점 주문번호
  */
 export const completePayment = onCall({
@@ -302,13 +302,13 @@ export const completePayment = onCall({
       throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
     }
 
-    const { impUid, merchantUid } = request.data;
+    const { paymentId, merchantUid } = request.data;
 
-    if (!impUid || !merchantUid) {
+    if (!paymentId || !merchantUid) {
       throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
     }
 
-    const result = await paymentService.completePayment(impUid, merchantUid);
+    const result = await paymentService.completePayment(paymentId, merchantUid);
 
     return {
       success: true,
