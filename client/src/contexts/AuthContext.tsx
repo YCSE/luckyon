@@ -129,7 +129,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUserInfo = async () => {
     if (user) {
-      const idToken = await user.getIdToken(true); // force refresh
+      // Custom claims가 업데이트된 경우에만 강제 refresh 필요
+      // 일반적인 경우 캐시된 토큰 사용으로 성능 개선
+      const idToken = await user.getIdToken();
       try {
         const response: any = await authAPI.verifyToken(idToken);
         if (response.success) {
