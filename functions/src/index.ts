@@ -15,6 +15,7 @@ import { toHttpsError, logError, AppError } from './utils/errors';
 import { ErrorCode, ServiceType } from './config/constants';
 import { db } from './config/firebase';
 import * as admin from 'firebase-admin';
+import * as crypto from 'crypto';
 import {
   validateSignupData,
   validateLoginData,
@@ -681,6 +682,49 @@ export const generateLoveFortune = onCall({
 });
 
 /**
+ * Standard Webhooks 기반 시그니처 검증
+ * @param secret - Webhook secret
+ * @param headers - HTTP 요청 헤더
+ * @param body - 원본 body (string)
+ * @returns 검증 성공 여부
+ */
+function verifyWebhookSignature(
+  secret: string,
+  headers: any,
+  body: string
+): boolean {
+  const webhookId = headers['webhook-id'];
+  const webhookTimestamp = headers['webhook-timestamp'];
+  const webhookSignature = headers['webhook-signature'];
+
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    console.error('[WebhookVerify] Missing required headers');
+    return false;
+  }
+
+  // Signed content: {id}.{timestamp}.{body}
+  const signedContent = `${webhookId}.${webhookTimestamp}.${body}`;
+
+  // HMAC SHA-256 계산
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(signedContent)
+    .digest('base64');
+
+  // Signature 형식: "v1,signature1 v1,signature2 ..."
+  const signatures = webhookSignature.split(' ');
+  for (const sig of signatures) {
+    const [version, signature] = sig.split(',');
+    if (version === 'v1' && signature === expectedSignature) {
+      return true;
+    }
+  }
+
+  console.error('[WebhookVerify] Signature mismatch');
+  return false;
+}
+
+/**
  * PortOne V2 Webhook Endpoint
  * 결제 완료 알림을 받아 completePayment를 호출하는 백업 경로
  * 클라이언트가 결제 후 페이지를 닫아도 결제 완료 처리를 보장
@@ -697,6 +741,26 @@ export const portoneWebhook = onRequest({
     if (request.method !== 'POST') {
       response.status(405).json({ error: 'Method not allowed' });
       return;
+    }
+
+    // Webhook signature 검증 (secret이 설정된 경우에만)
+    const { PORTONE_WEBHOOK_SECRET } = await import('./config/environment');
+    if (PORTONE_WEBHOOK_SECRET) {
+      const rawBody = JSON.stringify(request.body);
+      const isValid = verifyWebhookSignature(
+        PORTONE_WEBHOOK_SECRET,
+        request.headers,
+        rawBody
+      );
+
+      if (!isValid) {
+        console.error('[PortOneWebhook] Signature verification failed');
+        response.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      console.log('[PortOneWebhook] Signature verified successfully');
+    } else {
+      console.warn('[PortOneWebhook] Webhook secret not set, skipping verification');
     }
 
     // Webhook body 파싱
