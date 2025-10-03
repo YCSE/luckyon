@@ -133,8 +133,8 @@ export class PaymentService {
         createdAt: now
       };
 
-      // 결제 문서 생성
-      await db.collection('payments').doc(paymentId).set(payment);
+      // 결제 문서 생성 (merchantUid를 document ID로 사용)
+      await db.collection('payments').doc(merchantUid).set(payment);
 
       return {
         paymentId,
@@ -155,17 +155,13 @@ export class PaymentService {
    */
   async verifyPayment(data: VerifyPaymentData): Promise<any> {
     try {
-      // 1. 결제 문서 조회 (merchantUid로 쿼리)
-      const paymentQuery = await db.collection('payments')
-        .where('merchantUid', '==', data.merchantUid)
-        .limit(1)
-        .get();
+      // 1. 결제 문서 조회 (merchantUid로 직접 조회 - 성능 최적화)
+      const paymentDoc = await db.collection('payments').doc(data.merchantUid).get();
 
-      if (paymentQuery.empty) {
+      if (!paymentDoc.exists) {
         throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
       }
 
-      const paymentDoc = paymentQuery.docs[0];
       const payment = paymentDoc.data() as Payment;
 
       // 2. PortOne API 호출하여 결제 상태 조회
@@ -240,18 +236,14 @@ export class PaymentService {
     try {
       // Transaction을 사용하여 동시성 제어 및 원자성 보장
       const result = await db.runTransaction(async (transaction) => {
-        // 1. 결제 문서 조회 (merchantUid로 쿼리)
-        const paymentQuery = await db.collection('payments')
-          .where('merchantUid', '==', merchantUid)
-          .limit(1)
-          .get();
+        // 1. 결제 문서 조회 (merchantUid로 직접 조회 - 성능 최적화)
+        const paymentRef = db.collection('payments').doc(merchantUid);
+        const paymentDoc = await transaction.get(paymentRef);
 
-        if (paymentQuery.empty) {
+        if (!paymentDoc.exists) {
           throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
         }
 
-        const paymentDoc = paymentQuery.docs[0];
-        const paymentRef = paymentDoc.ref;
         const payment = paymentDoc.data() as Payment;
 
         // 2. 중복 처리 방지
@@ -329,52 +321,74 @@ export class PaymentService {
   }
 
   /**
-   * PortOne V2 API에서 결제 정보 조회
+   * PortOne V2 API에서 결제 정보 조회 (Retry 로직 포함)
    */
-  private async getPortOnePayment(paymentId: string): Promise<{
+  private async getPortOnePayment(paymentId: string, retries = 3): Promise<{
     id: string;
     amount: number;
     status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | 'PARTIAL_CANCELLED' | 'PAY_PENDING' | 'VIRTUAL_ACCOUNT_ISSUED';
     paidAt?: number;
   }> {
-    try {
-      // 환경변수는 함수 초기화 시점에 검증됨
-      const apiSecret = PORTONE_API_SECRET;
+    // 환경변수는 함수 초기화 시점에 검증됨
+    const apiSecret = PORTONE_API_SECRET;
 
-      // PortOne V2 API: 토큰 발급 없이 직접 인증
-      const paymentResponse = await axios.get<PortOneV2PaymentResponse>(
-        `https://api.portone.io/payments/${paymentId}`,
-        {
-          headers: {
-            Authorization: `PortOne ${apiSecret}`,
-            'Content-Type': 'application/json'
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // PortOne V2 API: 토큰 발급 없이 직접 인증
+        const paymentResponse = await axios.get<PortOneV2PaymentResponse>(
+          `https://api.portone.io/payments/${paymentId}`,
+          {
+            headers: {
+              Authorization: `PortOne ${apiSecret}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000 // 10초 timeout
           }
+        );
+
+        console.log('[PaymentService] PortOne API response:', {
+          id: paymentResponse.data.id,
+          status: paymentResponse.data.status,
+          amount: paymentResponse.data.amount.total
+        });
+
+        // PortOne V2 응답 구조:
+        // - id: 우리가 요청 시 보낸 paymentId (merchantUid)
+        // - status: READY | PAID | FAILED | CANCELLED 등
+        // - amount.total: 결제 금액
+        return {
+          id: paymentResponse.data.id,
+          amount: paymentResponse.data.amount.total,
+          status: paymentResponse.data.status,
+          paidAt: paymentResponse.data.paidAt ? new Date(paymentResponse.data.paidAt).getTime() / 1000 : undefined
+        };
+      } catch (error: any) {
+        const isLastAttempt = attempt === retries - 1;
+        const is404 = error.response?.status === 404;
+
+        console.error(`[PaymentService] PortOne API error (attempt ${attempt + 1}/${retries}):`, {
+          paymentId,
+          status: error.response?.status,
+          error: error.response?.data || error.message
+        });
+
+        // 404 에러는 재시도하지 않음 (결제 정보 없음)
+        if (is404 || isLastAttempt) {
+          throw new AppError(
+            ErrorCode.SYS002,
+            `PortOne API 오류: ${error.response?.data?.message || error.message}`
+          );
         }
-      );
 
-      console.log('[PaymentService] PortOne API response:', {
-        id: paymentResponse.data.id,
-        status: paymentResponse.data.status,
-        amount: paymentResponse.data.amount.total
-      });
-
-      // PortOne V2 응답 구조:
-      // - id: 우리가 요청 시 보낸 paymentId (merchantUid)
-      // - status: READY | PAID | FAILED | CANCELLED 등
-      // - amount.total: 결제 금액
-      return {
-        id: paymentResponse.data.id,
-        amount: paymentResponse.data.amount.total,
-        status: paymentResponse.data.status,
-        paidAt: paymentResponse.data.paidAt ? new Date(paymentResponse.data.paidAt).getTime() / 1000 : undefined
-      };
-    } catch (error: any) {
-      console.error('[PaymentService] PortOne API error:', {
-        paymentId,
-        error: error.response?.data || error.message
-      });
-      throw new AppError(ErrorCode.SYS002, `PortOne API 오류: ${error.message}`);
+        // 재시도 전 대기 (exponential backoff)
+        const waitTime = 1000 * (attempt + 1);
+        console.log(`[PaymentService] Retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
+
+    // 이 코드에 도달하면 안되지만 TypeScript를 위해 추가
+    throw new AppError(ErrorCode.SYS002, 'PortOne API 호출 실패');
   }
 
   /**
