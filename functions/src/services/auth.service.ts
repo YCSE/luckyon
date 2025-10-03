@@ -102,7 +102,12 @@ export class AuthService {
 
       await db.collection('users').doc(userRecord.uid).set(userData);
 
-      // 5. 추천인의 referredUsers 배열 업데이트
+      // 5. Custom claims 설정 (admin 권한 체크 성능 개선)
+      await auth.setCustomUserClaims(userRecord.uid, {
+        memberGrade: MEMBER_GRADES.MEMBER
+      });
+
+      // 6. 추천인의 referredUsers 배열 업데이트
       if (referredBy) {
         await db.collection('users').doc(referredBy).update({
           referredUsers: admin.firestore.FieldValue.arrayUnion(userRecord.uid),
@@ -110,7 +115,7 @@ export class AuthService {
         });
       }
 
-      // 6. 회원가입 성공 응답 (토큰 없이)
+      // 7. 회원가입 성공 응답 (토큰 없이)
       return {
         uid: userRecord.uid,
         email: data.email,

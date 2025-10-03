@@ -2,7 +2,7 @@
  * Admin Service
  * 관리자 기능
  */
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { AppError } from '../utils/errors';
 import { ErrorCode, MEMBER_GRADES, MemberGrade } from '../config/constants';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -29,8 +29,19 @@ interface Analytics {
 export class AdminService {
   /**
    * 관리자 권한 확인
+   * @param uid - 사용자 UID
+   * @param memberGrade - Custom claims에서 가져온 memberGrade (선택사항)
    */
-  private async checkAdminPermission(uid: string): Promise<void> {
+  private async checkAdminPermission(uid: string, memberGrade?: string): Promise<void> {
+    // Custom claims가 제공된 경우 Firestore read 없이 검증 (성능 개선)
+    if (memberGrade !== undefined) {
+      if (memberGrade !== MEMBER_GRADES.ADMIN) {
+        throw new AppError(ErrorCode.AUTH004, '관리자 권한이 필요합니다.');
+      }
+      return;
+    }
+
+    // Custom claims가 없는 경우 기존 방식 (Firestore read)
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       throw new AppError(ErrorCode.AUTH002, '사용자를 찾을 수 없습니다.');
@@ -45,9 +56,9 @@ export class AdminService {
   /**
    * 사용자 목록 조회
    */
-  async getUsersList(adminUid: string, query: UserListQuery = {}): Promise<any[]> {
+  async getUsersList(adminUid: string, query: UserListQuery = {}, memberGradeFromClaims?: string): Promise<any[]> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGradeFromClaims);
 
       const { memberGrade, limit = 50, startAfter } = query;
 
@@ -93,9 +104,9 @@ export class AdminService {
   /**
    * 사용자 등급 변경
    */
-  async updateUserGrade(adminUid: string, targetUid: string, newGrade: MemberGrade): Promise<void> {
+  async updateUserGrade(adminUid: string, targetUid: string, newGrade: MemberGrade, memberGradeFromClaims?: string): Promise<void> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGradeFromClaims);
 
       // 유효한 등급인지 확인
       const validGrades = Object.values(MEMBER_GRADES);
@@ -116,6 +127,11 @@ export class AdminService {
         updatedAt: now
       });
 
+      // Custom claims 업데이트 (admin 권한 체크 성능 개선)
+      await auth.setCustomUserClaims(targetUid, {
+        memberGrade: newGrade
+      });
+
       console.log(`User grade updated: ${targetUid} -> ${newGrade} by ${adminUid}`);
     } catch (error: any) {
       if (error instanceof AppError) {
@@ -128,9 +144,9 @@ export class AdminService {
   /**
    * 서비스 통계 조회
    */
-  async getAnalytics(adminUid: string): Promise<Analytics> {
+  async getAnalytics(adminUid: string, memberGrade?: string): Promise<Analytics> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGrade);
 
       // 1. 사용자 통계
       const usersSnapshot = await db.collection('users').get();
@@ -251,10 +267,11 @@ export class AdminService {
   async updateSystemConfig(
     adminUid: string,
     configType: string,
-    configData: any
+    configData: any,
+    memberGrade?: string
   ): Promise<void> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGrade);
 
       const now = Timestamp.now();
 
@@ -276,9 +293,9 @@ export class AdminService {
   /**
    * 시스템 설정 조회
    */
-  async getSystemConfig(adminUid: string, configType: string): Promise<any> {
+  async getSystemConfig(adminUid: string, configType: string, memberGrade?: string): Promise<any> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGrade);
 
       const configDoc = await db.collection('system_config').doc(configType).get();
 
@@ -298,9 +315,9 @@ export class AdminService {
   /**
    * 사용자 상세 정보 조회 (관리자용)
    */
-  async getUserDetail(adminUid: string, targetUid: string): Promise<any> {
+  async getUserDetail(adminUid: string, targetUid: string, memberGrade?: string): Promise<any> {
     try {
-      await this.checkAdminPermission(adminUid);
+      await this.checkAdminPermission(adminUid, memberGrade);
 
       const userDoc = await db.collection('users').doc(targetUid).get();
       if (!userDoc.exists) {

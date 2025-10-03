@@ -686,6 +686,7 @@ export const getUsersList = onCall({
 }, async (request) => {
   try {
     const uid = request.auth?.uid;
+    const memberGradeFromClaims = request.auth?.token?.memberGrade as string | undefined;
 
     if (!uid) {
       throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
@@ -693,7 +694,7 @@ export const getUsersList = onCall({
 
     const { memberGrade, limit, startAfter } = request.data || {};
 
-    const users = await adminService.getUsersList(uid, { memberGrade, limit, startAfter });
+    const users = await adminService.getUsersList(uid, { memberGrade, limit, startAfter }, memberGradeFromClaims);
 
     return {
       success: true,
@@ -717,6 +718,7 @@ export const updateUserGrade = onCall({
 }, async (request) => {
   try {
     const uid = request.auth?.uid;
+    const memberGrade = request.auth?.token?.memberGrade as string | undefined;
 
     if (!uid) {
       throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
@@ -728,7 +730,7 @@ export const updateUserGrade = onCall({
       throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
     }
 
-    await adminService.updateUserGrade(uid, targetUid, newGrade);
+    await adminService.updateUserGrade(uid, targetUid, newGrade, memberGrade);
 
     return {
       success: true,
@@ -751,12 +753,13 @@ export const getAnalytics = onCall({
 }, async (request) => {
   try {
     const uid = request.auth?.uid;
+    const memberGrade = request.auth?.token?.memberGrade as string | undefined;
 
     if (!uid) {
       throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
     }
 
-    const analytics = await adminService.getAnalytics(uid);
+    const analytics = await adminService.getAnalytics(uid, memberGrade);
 
     return {
       success: true,
@@ -780,6 +783,7 @@ export const updateSystemConfig = onCall({
 }, async (request) => {
   try {
     const uid = request.auth?.uid;
+    const memberGrade = request.auth?.token?.memberGrade as string | undefined;
 
     if (!uid) {
       throw new AppError(ErrorCode.AUTH001, '인증이 필요합니다.');
@@ -791,7 +795,7 @@ export const updateSystemConfig = onCall({
       throw new AppError(ErrorCode.SVC002, '필수 입력값이 누락되었습니다.');
     }
 
-    await adminService.updateSystemConfig(uid, configType, configData);
+    await adminService.updateSystemConfig(uid, configType, configData, memberGrade);
 
     return {
       success: true,
