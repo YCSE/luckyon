@@ -33,7 +33,7 @@ interface PortOneV2PaymentResponse {
     total: number;
     currency: string;
   };
-  status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED';
+  status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | 'PARTIAL_CANCELLED' | 'PAY_PENDING' | 'VIRTUAL_ACCOUNT_ISSUED';
   paidAt?: string;
 }
 
