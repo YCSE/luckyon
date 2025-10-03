@@ -5,6 +5,7 @@
 import { onRequest, onCall } from 'firebase-functions/v2/https';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import './config/firebase'; // Firebase Admin 초기화
+import { validateEnvironment } from './config/environment';
 import { authService } from './services/auth.service';
 import { fortuneService } from './services/fortune.service';
 import { paymentService } from './services/payment.service';
@@ -22,6 +23,13 @@ import {
   validateWealthData,
   validateLoveData
 } from './utils/validators';
+
+// 환경변수 검증 (Functions 초기화 시점에 실행)
+if (!validateEnvironment()) {
+  console.error('[Functions Init] WARNING: Required environment variables are missing!');
+  console.error('[Functions Init] Please set GEMINI_API_KEY, PORTONE_STORE_ID, and PORTONE_API_SECRET');
+  console.error('[Functions Init] Functions will deploy but may fail at runtime');
+}
 
 // Health check endpoint
 export const healthCheck = onRequest(

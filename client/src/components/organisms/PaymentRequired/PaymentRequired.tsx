@@ -97,21 +97,21 @@ export const PaymentRequired: React.FC<PaymentRequiredProps> = ({
         if (paymentIdFromResponse) {
           try {
             console.log('[PaymentRequired] Calling verifyPayment with:', { paymentId: paymentIdFromResponse, merchantUid });
-            const verifyResponse: any = await paymentAPI.verify(
+            const verifyResponse = await paymentAPI.verify(
               paymentIdFromResponse,
               merchantUid
             );
             console.log('[PaymentRequired] Verify response:', verifyResponse);
 
-            if (verifyResponse.success) {
+            if (verifyResponse.data.success) {
               console.log('[PaymentRequired] Calling completePayment with:', { paymentId: paymentIdFromResponse, merchantUid });
-              const completeResponse: any = await paymentAPI.complete(
+              const completeResponse = await paymentAPI.complete(
                 paymentIdFromResponse,
                 merchantUid
               );
               console.log('[PaymentRequired] Complete response:', completeResponse);
 
-              if (completeResponse.success) {
+              if (completeResponse.data.success) {
                 console.log('[PaymentRequired] Payment completed successfully:', completeResponse);
 
                 // 사용자 정보를 갱신하여 결제 권한을 업데이트
