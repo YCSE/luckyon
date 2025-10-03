@@ -49,31 +49,59 @@ export const healthCheck = onRequest(
 );
 
 /**
- * 일회성 결제 사용 처리 헬퍼 함수
- * 일회성 구매로 접근한 경우 사용 후 oneTimePurchases에서 제거
- * @returns true면 일회성 사용 완료, false면 구독으로 접근
+ * 일회성 결제 권한 확인 및 예약 (Transaction 기반)
+ * Race condition 방지를 위해 구독 확인 + 일회성 구매 소진을 atomic하게 처리
+ * @returns 'subscription' | 'oneTime' | 'none'
  */
-async function consumeOneTimePurchase(uid: string, serviceType: ServiceType): Promise<boolean> {
-  const userDoc = await db.collection('users').doc(uid).get();
+async function checkAndReserveOneTimePurchase(
+  uid: string,
+  serviceType: ServiceType
+): Promise<'subscription' | 'oneTime' | 'none'> {
+  return await db.runTransaction(async (transaction) => {
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await transaction.get(userRef);
 
-  if (!userDoc.exists) {
-    return false;
-  }
+    if (!userDoc.exists) {
+      return 'none';
+    }
 
-  const userData = userDoc.data();
-  const oneTimePurchases = userData?.oneTimePurchases || [];
+    const userData = userDoc.data();
 
-  // 일회성 구매 항목인지 확인
-  if (Array.isArray(oneTimePurchases) && oneTimePurchases.includes(serviceType)) {
-    // oneTimePurchases에서 제거 (1회 사용 완료)
-    await db.collection('users').doc(uid).update({
-      oneTimePurchases: admin.firestore.FieldValue.arrayRemove(serviceType)
-    });
-    console.log(`[OneTimePurchase] Consumed ${serviceType} for user ${uid}`);
-    return true;
-  }
+    // 1. 구독 확인 (우선순위 높음)
+    if (userData?.currentSubscription) {
+      const expiresAt = userData.currentSubscription.expiresAt.toDate();
+      const now = new Date();
 
-  return false;
+      if (expiresAt > now) {
+        console.log(`[AccessCheck] User ${uid} accessed ${serviceType} via subscription`);
+        return 'subscription';
+      }
+    }
+
+    // 2. 일회성 구매 확인 및 소진 (Transaction 내에서 atomic하게 처리)
+    const oneTimePurchases = userData?.oneTimePurchases || [];
+    if (Array.isArray(oneTimePurchases) && oneTimePurchases.includes(serviceType)) {
+      // Transaction 내에서 바로 제거 - race condition 방지
+      transaction.update(userRef, {
+        oneTimePurchases: admin.firestore.FieldValue.arrayRemove(serviceType)
+      });
+      console.log(`[AccessCheck] User ${uid} reserved one-time access for ${serviceType}`);
+      return 'oneTime';
+    }
+
+    // 3. 접근 권한 없음
+    return 'none';
+  });
+}
+
+/**
+ * 일회성 구매 복원 (운세 생성 실패 시 rollback용)
+ */
+async function restoreOneTimePurchase(uid: string, serviceType: ServiceType): Promise<void> {
+  await db.collection('users').doc(uid).update({
+    oneTimePurchases: admin.firestore.FieldValue.arrayUnion(serviceType)
+  });
+  console.log(`[AccessCheck] Restored one-time purchase for user ${uid}, service ${serviceType}`);
 }
 
 /**
@@ -208,15 +236,19 @@ export const generateTodayFortune = onCall({
     // 입력값 검증
     validateTodayFortuneData({ name, birthDate });
 
-    // 1. 접근 권한 확인
-    const hasAccess = await fortuneService.checkAccess(uid, 'today');
-    if (!hasAccess) {
+    // 1. 접근 권한 확인 및 예약 (Transaction - race condition 방지)
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'today');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     // 2. 캐시 확인
     const cached = await fortuneService.getCached(uid, 'today', { name, birthDate });
     if (cached) {
+      // 캐시 hit인 경우 일회성 구매 복원 (아직 사용 안한 것으로 간주)
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'today');
+      }
       return {
         success: true,
         data: cached
@@ -224,16 +256,23 @@ export const generateTodayFortune = onCall({
     }
 
     // 3. 새로운 운세 생성 (임시 paymentId)
-    const result = await fortuneService.generateFortune(
-      uid,
-      'today',
-      { name, birthDate },
-      'temp_payment_id' // 실제로는 결제 시스템과 연동 필요
-    );
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid,
+        'today',
+        { name, birthDate },
+        'temp_payment_id' // 실제로는 결제 시스템과 연동 필요
+      );
+    } catch (error) {
+      // 운세 생성 실패 시 일회성 구매 복원
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'today');
+      }
+      throw error;
+    }
 
-    // 4. 일회성 구매였다면 사용 완료 처리 (배열에서 제거)
-    await consumeOneTimePurchase(uid, 'today');
-
+    // 4. 성공 (일회성 구매는 이미 checkAndReserveOneTimePurchase에서 소진됨)
     return {
       success: true,
       data: result
@@ -377,21 +416,30 @@ export const generateSajuAnalysis = onCall({
     const { name, birthDate, birthTime } = request.data;
     validateSajuData({ name, birthDate, birthTime });
 
-    const hasAccess = await fortuneService.checkAccess(uid, 'saju');
-    if (!hasAccess) {
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'saju');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     const cached = await fortuneService.getCached(uid, 'saju', { name, birthDate, birthTime });
     if (cached) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'saju');
+      }
       return { success: true, data: cached };
     }
 
-    const result = await fortuneService.generateFortune(
-      uid, 'saju', { name, birthDate, birthTime }, 'temp_payment_id'
-    );
-
-    await consumeOneTimePurchase(uid, 'saju');
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid, 'saju', { name, birthDate, birthTime }, 'temp_payment_id'
+      );
+    } catch (error) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'saju');
+      }
+      throw error;
+    }
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -424,21 +472,30 @@ export const generateTojungSecret = onCall({
     const { name, birthDate, lunarCalendar } = request.data;
     validateTojungData({ name, birthDate, lunarCalendar });
 
-    const hasAccess = await fortuneService.checkAccess(uid, 'tojung');
-    if (!hasAccess) {
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'tojung');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     const cached = await fortuneService.getCached(uid, 'tojung', { name, birthDate, lunarCalendar });
     if (cached) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'tojung');
+      }
       return { success: true, data: cached };
     }
 
-    const result = await fortuneService.generateFortune(
-      uid, 'tojung', { name, birthDate, lunarCalendar }, 'temp_payment_id'
-    );
-
-    await consumeOneTimePurchase(uid, 'tojung');
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid, 'tojung', { name, birthDate, lunarCalendar }, 'temp_payment_id'
+      );
+    } catch (error) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'tojung');
+      }
+      throw error;
+    }
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -472,24 +529,33 @@ export const generateCompatibility = onCall({
     const { name, birthDate, partnerName, partnerBirthDate } = request.data;
     validateCompatibilityData({ name, birthDate, partnerName, partnerBirthDate });
 
-    const hasAccess = await fortuneService.checkAccess(uid, 'compatibility');
-    if (!hasAccess) {
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'compatibility');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     const cached = await fortuneService.getCached(uid, 'compatibility',
       { name, birthDate, partnerName, partnerBirthDate });
     if (cached) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'compatibility');
+      }
       return { success: true, data: cached };
     }
 
-    const result = await fortuneService.generateFortune(
-      uid, 'compatibility',
-      { name, birthDate, partnerName, partnerBirthDate },
-      'temp_payment_id'
-    );
-
-    await consumeOneTimePurchase(uid, 'compatibility');
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid, 'compatibility',
+        { name, birthDate, partnerName, partnerBirthDate },
+        'temp_payment_id'
+      );
+    } catch (error) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'compatibility');
+      }
+      throw error;
+    }
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -522,21 +588,30 @@ export const generateWealthFortune = onCall({
     const { name, birthDate, jobType } = request.data;
     validateWealthData({ name, birthDate, jobType });
 
-    const hasAccess = await fortuneService.checkAccess(uid, 'wealth');
-    if (!hasAccess) {
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'wealth');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     const cached = await fortuneService.getCached(uid, 'wealth', { name, birthDate, jobType });
     if (cached) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'wealth');
+      }
       return { success: true, data: cached };
     }
 
-    const result = await fortuneService.generateFortune(
-      uid, 'wealth', { name, birthDate, jobType }, 'temp_payment_id'
-    );
-
-    await consumeOneTimePurchase(uid, 'wealth');
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid, 'wealth', { name, birthDate, jobType }, 'temp_payment_id'
+      );
+    } catch (error) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'wealth');
+      }
+      throw error;
+    }
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -570,24 +645,33 @@ export const generateLoveFortune = onCall({
     const { name, birthDate, gender, relationshipStatus } = request.data;
     validateLoveData({ name, birthDate, gender, relationshipStatus });
 
-    const hasAccess = await fortuneService.checkAccess(uid, 'love');
-    if (!hasAccess) {
+    const accessType = await checkAndReserveOneTimePurchase(uid, 'love');
+    if (accessType === 'none') {
       throw new AppError(ErrorCode.SVC001, '접근 권한이 없습니다. 결제가 필요합니다.');
     }
 
     const cached = await fortuneService.getCached(uid, 'love',
       { name, birthDate, gender, relationshipStatus });
     if (cached) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'love');
+      }
       return { success: true, data: cached };
     }
 
-    const result = await fortuneService.generateFortune(
-      uid, 'love',
-      { name, birthDate, gender, relationshipStatus },
-      'temp_payment_id'
-    );
-
-    await consumeOneTimePurchase(uid, 'love');
+    let result;
+    try {
+      result = await fortuneService.generateFortune(
+        uid, 'love',
+        { name, birthDate, gender, relationshipStatus },
+        'temp_payment_id'
+      );
+    } catch (error) {
+      if (accessType === 'oneTime') {
+        await restoreOneTimePurchase(uid, 'love');
+      }
+      throw error;
+    }
 
     return { success: true, data: result };
   } catch (error: any) {
