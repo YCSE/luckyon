@@ -12,7 +12,9 @@ import { paymentService } from './services/payment.service';
 import { referralService } from './services/referral.service';
 import { adminService } from './services/admin.service';
 import { toHttpsError, logError, AppError } from './utils/errors';
-import { ErrorCode } from './config/constants';
+import { ErrorCode, ServiceType } from './config/constants';
+import { db } from './config/firebase';
+import * as admin from 'firebase-admin';
 import {
   validateSignupData,
   validateLoginData,
@@ -45,6 +47,34 @@ export const healthCheck = onRequest(
     });
   }
 );
+
+/**
+ * 일회성 결제 사용 처리 헬퍼 함수
+ * 일회성 구매로 접근한 경우 사용 후 oneTimePurchases에서 제거
+ * @returns true면 일회성 사용 완료, false면 구독으로 접근
+ */
+async function consumeOneTimePurchase(uid: string, serviceType: ServiceType): Promise<boolean> {
+  const userDoc = await db.collection('users').doc(uid).get();
+
+  if (!userDoc.exists) {
+    return false;
+  }
+
+  const userData = userDoc.data();
+  const oneTimePurchases = userData?.oneTimePurchases || [];
+
+  // 일회성 구매 항목인지 확인
+  if (Array.isArray(oneTimePurchases) && oneTimePurchases.includes(serviceType)) {
+    // oneTimePurchases에서 제거 (1회 사용 완료)
+    await db.collection('users').doc(uid).update({
+      oneTimePurchases: admin.firestore.FieldValue.arrayRemove(serviceType)
+    });
+    console.log(`[OneTimePurchase] Consumed ${serviceType} for user ${uid}`);
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * 회원가입
@@ -200,6 +230,9 @@ export const generateTodayFortune = onCall({
       { name, birthDate },
       'temp_payment_id' // 실제로는 결제 시스템과 연동 필요
     );
+
+    // 4. 일회성 구매였다면 사용 완료 처리 (배열에서 제거)
+    await consumeOneTimePurchase(uid, 'today');
 
     return {
       success: true,
@@ -358,6 +391,8 @@ export const generateSajuAnalysis = onCall({
       uid, 'saju', { name, birthDate, birthTime }, 'temp_payment_id'
     );
 
+    await consumeOneTimePurchase(uid, 'saju');
+
     return { success: true, data: result };
   } catch (error: any) {
     logError('generateSajuAnalysis', error, request.data);
@@ -402,6 +437,8 @@ export const generateTojungSecret = onCall({
     const result = await fortuneService.generateFortune(
       uid, 'tojung', { name, birthDate, lunarCalendar }, 'temp_payment_id'
     );
+
+    await consumeOneTimePurchase(uid, 'tojung');
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -452,6 +489,8 @@ export const generateCompatibility = onCall({
       'temp_payment_id'
     );
 
+    await consumeOneTimePurchase(uid, 'compatibility');
+
     return { success: true, data: result };
   } catch (error: any) {
     logError('generateCompatibility', error, request.data);
@@ -496,6 +535,8 @@ export const generateWealthFortune = onCall({
     const result = await fortuneService.generateFortune(
       uid, 'wealth', { name, birthDate, jobType }, 'temp_payment_id'
     );
+
+    await consumeOneTimePurchase(uid, 'wealth');
 
     return { success: true, data: result };
   } catch (error: any) {
@@ -545,6 +586,8 @@ export const generateLoveFortune = onCall({
       { name, birthDate, gender, relationshipStatus },
       'temp_payment_id'
     );
+
+    await consumeOneTimePurchase(uid, 'love');
 
     return { success: true, data: result };
   } catch (error: any) {
