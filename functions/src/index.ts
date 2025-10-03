@@ -679,6 +679,81 @@ export const generateLoveFortune = onCall({
     throw toHttpsError(error);
   }
 });
+
+/**
+ * PortOne V2 Webhook Endpoint
+ * 결제 완료 알림을 받아 completePayment를 호출하는 백업 경로
+ * 클라이언트가 결제 후 페이지를 닫아도 결제 완료 처리를 보장
+ */
+export const portoneWebhook = onRequest({
+  region: 'asia-northeast3',
+  memory: '2GiB',
+  concurrency: 100,
+  cors: true,
+  timeoutSeconds: 30
+}, async (request, response) => {
+  try {
+    // POST 요청만 허용
+    if (request.method !== 'POST') {
+      response.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    // Webhook body 파싱
+    const webhookBody = request.body;
+    console.log('[PortOneWebhook] Received webhook:', JSON.stringify(webhookBody));
+
+    // Webhook 타입 확인 (2024-04-25 버전)
+    if (!webhookBody || typeof webhookBody !== 'object') {
+      console.error('[PortOneWebhook] Invalid webhook body');
+      response.status(400).json({ error: 'Invalid webhook body' });
+      return;
+    }
+
+    const { type, data } = webhookBody;
+
+    // Transaction.Paid 이벤트만 처리
+    if (type === 'Transaction.Paid') {
+      const { paymentId } = data;
+
+      if (!paymentId) {
+        console.error('[PortOneWebhook] Missing paymentId in webhook data');
+        response.status(400).json({ error: 'Missing paymentId' });
+        return;
+      }
+
+      console.log(`[PortOneWebhook] Processing Transaction.Paid for paymentId: ${paymentId}`);
+
+      // merchantUid = paymentId (우리가 생성한 값)
+      const merchantUid = paymentId;
+
+      try {
+        // 결제 완료 처리 (중복 처리는 completePayment 내부에서 방지)
+        await paymentService.completePayment(paymentId, merchantUid);
+        console.log(`[PortOneWebhook] Payment completed successfully: ${paymentId}`);
+      } catch (error: any) {
+        // 이미 처리된 결제인 경우 (PAY002 에러) 정상 응답
+        if (error.code === ErrorCode.PAY002) {
+          console.log(`[PortOneWebhook] Payment already completed: ${paymentId}`);
+          response.status(200).json({ success: true, message: 'Already processed' });
+          return;
+        }
+        throw error;
+      }
+    } else {
+      // 다른 이벤트 타입은 무시 (로그만 남김)
+      console.log(`[PortOneWebhook] Ignored event type: ${type}`);
+    }
+
+    // 성공 응답
+    response.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('[PortOneWebhook] Error processing webhook:', error);
+    logError('portoneWebhook', error, request.body);
+    response.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * 결제 완료 시 리퍼럴 크레딧 처리 (트리거)
  */
