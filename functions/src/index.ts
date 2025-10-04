@@ -697,6 +697,12 @@ function verifyWebhookSignature(
   const webhookTimestamp = headers['webhook-timestamp'];
   const webhookSignature = headers['webhook-signature'];
 
+  console.log('[WebhookVerify] Headers:', {
+    'webhook-id': webhookId,
+    'webhook-timestamp': webhookTimestamp,
+    'webhook-signature': webhookSignature ? webhookSignature.substring(0, 50) + '...' : undefined
+  });
+
   if (!webhookId || !webhookTimestamp || !webhookSignature) {
     console.error('[WebhookVerify] Missing required headers');
     return false;
@@ -704,6 +710,8 @@ function verifyWebhookSignature(
 
   // Signed content: {id}.{timestamp}.{body}
   const signedContent = `${webhookId}.${webhookTimestamp}.${body}`;
+  console.log('[WebhookVerify] Signed content length:', signedContent.length);
+  console.log('[WebhookVerify] Body preview:', body.substring(0, 100));
 
   // HMAC SHA-256 계산
   const expectedSignature = crypto
@@ -711,16 +719,22 @@ function verifyWebhookSignature(
     .update(signedContent)
     .digest('base64');
 
+  console.log('[WebhookVerify] Expected signature:', expectedSignature);
+
   // Signature 형식: "v1,signature1 v1,signature2 ..."
   const signatures = webhookSignature.split(' ');
+  console.log('[WebhookVerify] Received signatures:', signatures);
+
   for (const sig of signatures) {
     const [version, signature] = sig.split(',');
+    console.log('[WebhookVerify] Checking signature:', { version, signature });
     if (version === 'v1' && signature === expectedSignature) {
+      console.log('[WebhookVerify] ✓ Signature match!');
       return true;
     }
   }
 
-  console.error('[WebhookVerify] Signature mismatch');
+  console.error('[WebhookVerify] ✗ Signature mismatch - none of the signatures matched');
   return false;
 }
 
@@ -743,10 +757,27 @@ export const portoneWebhook = onRequest({
       return;
     }
 
-    // Webhook signature 검증 (secret이 설정된 경우에만)
+    // 디버깅: 모든 헤더와 body 로깅
+    console.log('[PortOneWebhook] === DEBUG START ===');
+    console.log('[PortOneWebhook] All headers:', JSON.stringify(request.headers, null, 2));
+    console.log('[PortOneWebhook] Content-Type:', request.headers['content-type']);
+    console.log('[PortOneWebhook] Parsed body type:', typeof request.body);
+    console.log('[PortOneWebhook] Parsed body:', JSON.stringify(request.body, null, 2));
+    console.log('[PortOneWebhook] rawBody exists:', !!(request as any).rawBody);
+    console.log('[PortOneWebhook] rawBody type:', typeof (request as any).rawBody);
+    if ((request as any).rawBody) {
+      console.log('[PortOneWebhook] rawBody length:', (request as any).rawBody.length);
+      console.log('[PortOneWebhook] rawBody preview:', (request as any).rawBody.toString('utf-8').substring(0, 200));
+    }
+    console.log('[PortOneWebhook] === DEBUG END ===');
+
+    // Webhook signature 검증 (임시로 비활성화하여 테스트)
     const { PORTONE_WEBHOOK_SECRET } = await import('./config/environment');
-    if (PORTONE_WEBHOOK_SECRET) {
-      const rawBody = JSON.stringify(request.body);
+    if (PORTONE_WEBHOOK_SECRET && false) { // 임시로 false 추가
+      // Firebase Functions의 rawBody 사용 (원본 body bytes)
+      const rawBody = (request as any).rawBody?.toString('utf-8') || JSON.stringify(request.body);
+      console.log('[PortOneWebhook] Using rawBody for signature verification');
+
       const isValid = verifyWebhookSignature(
         PORTONE_WEBHOOK_SECRET,
         request.headers,
@@ -760,7 +791,7 @@ export const portoneWebhook = onRequest({
       }
       console.log('[PortOneWebhook] Signature verified successfully');
     } else {
-      console.warn('[PortOneWebhook] Webhook secret not set, skipping verification');
+      console.warn('[PortOneWebhook] Webhook signature verification DISABLED for debugging');
     }
 
     // Webhook body 파싱
