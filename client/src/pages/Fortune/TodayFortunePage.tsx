@@ -8,7 +8,7 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
-import { DateInput } from '../../components/atoms/DateInput';
+import { BirthDateInput } from '../../components/atoms/BirthDateInput';
 import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 import { SERVICE_PRICES, SERVICE_NAMES, SERVICE_DESCRIPTIONS } from '../../constants/pricing';
 
@@ -150,11 +150,10 @@ export const TodayFortunePage: React.FC = () => {
         </div>
 
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={birthDate}
             onChange={setBirthDate}
-            placeholder="예: 1990년 1월 1일"
             required
           />
         </div>

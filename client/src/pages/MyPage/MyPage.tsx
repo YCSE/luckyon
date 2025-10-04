@@ -2,11 +2,9 @@
  * MyPage
  * 마이페이지 - 운세 기록 조회
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
-import { Header } from '../../components/layout/Header';
-import { HamburgerMenu } from '../../components/layout/HamburgerMenu';
 import { FortuneHistoryCard } from '../../components/molecules/FortuneHistoryCard';
 import { FortuneDetailModal } from '../../components/organisms/FortuneDetailModal';
 import { getFortuneHistory, FortuneResult } from '../../services/fortuneHistory';
@@ -14,8 +12,6 @@ import { tokens } from '../../design-system/tokens';
 
 export const MyPage: React.FC = () => {
   const { user } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [fortunes, setFortunes] = useState<FortuneResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,9 +50,6 @@ export const MyPage: React.FC = () => {
   return (
     <PageWrapper>
       <Container>
-        <Header onMenuClick={() => setMenuOpen(true)} menuButtonRef={menuButtonRef} />
-        <HamburgerMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} menuButtonRef={menuButtonRef} />
-
         <Content>
           <Title>마이페이지</Title>
           <Subtitle>보셨던 운세를 다시 확인할 수 있어요</Subtitle>

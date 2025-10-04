@@ -8,7 +8,7 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
-import { DateInput } from '../../components/atoms/DateInput';
+import { BirthDateInput } from '../../components/atoms/BirthDateInput';
 import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
@@ -124,11 +124,11 @@ export const CompatibilityPage: React.FC = () => {
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={birthDate}
             onChange={setBirthDate}
-            placeholder="예: 1990년 1월 1일"
+            
             required
           />
         </div>
@@ -139,11 +139,11 @@ export const CompatibilityPage: React.FC = () => {
           <Input type="text" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} required />
         </div>
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={partnerBirthDate}
             onChange={setPartnerBirthDate}
-            placeholder="예: 1990년 1월 1일"
+            
             required
           />
         </div>

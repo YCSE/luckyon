@@ -80,6 +80,32 @@ const HeroSubtitle = styled.p`
   margin-top: 20px;
 `;
 
+const HeroButton = styled.button`
+  font-family: ${tokens.typography.fontFamily.primary};
+  font-size: 18px;
+  font-weight: ${tokens.typography.fontWeight.semibold};
+  color: ${tokens.colors.neutral[0]};
+  background-color: ${tokens.colors.primary[500]};
+  border: none;
+  border-radius: 50px;
+  padding: 18px 60px;
+  margin-top: 40px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: all ${tokens.animation.duration.base} ${tokens.animation.easing.ease};
+
+  &:hover {
+    background-color: ${tokens.colors.primary[600]};
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
 const ContentSection = styled.section`
   max-width: 1200px;
   margin: 0 auto;
@@ -268,6 +294,14 @@ export const LoginPage: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
+  // Scroll to login section
+  const handleScrollToLogin = () => {
+    const loginSection = document.getElementById('login-form');
+    if (loginSection) {
+      loginSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Signup form state
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
@@ -399,6 +433,9 @@ export const LoginPage: React.FC = () => {
         <HeroSubtitle data-node-id="85:133">
           당신의 행운이 빛나는 순간을 밝혀드립니다
         </HeroSubtitle>
+        <HeroButton onClick={handleScrollToLogin}>
+          시작하기
+        </HeroButton>
       </HeroSection>
 
       <ContentSection>
@@ -426,7 +463,7 @@ export const LoginPage: React.FC = () => {
           지금 확인해 보세요!
         </SectionTitle>
 
-        <LoginSection>
+        <LoginSection id="login-form">
           <TabContainer data-name="tab" data-node-id="85:347">
             <Tab
               $active={activeTab === 'login'}
