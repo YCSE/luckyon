@@ -8,7 +8,9 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
-import { DateInput } from '../../components/atoms/DateInput';
+import { BirthDateInput } from '../../components/atoms/BirthDateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
+import { SERVICE_PRICES, SERVICE_NAMES, SERVICE_DESCRIPTIONS } from '../../constants/pricing';
 
 const Container = styled.div`
   max-width: 800px;
@@ -79,7 +81,7 @@ const LoadingMessage = styled.div`
 `;
 
 export const TodayFortunePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -118,6 +120,19 @@ export const TodayFortunePage: React.FC = () => {
     );
   }
 
+  // 결제 확인
+  if (!checkServiceAccess('today')) {
+    return (
+      <PaymentRequired
+        serviceName={SERVICE_NAMES.today}
+        productType="today"
+        oneTimePrice={SERVICE_PRICES.today}
+        oneTimeDescription={SERVICE_DESCRIPTIONS.today}
+        oneTimeFeatures={['6시간 캐시', '종합운/사랑운/재물운/건강운']}
+      />
+    );
+  }
+
   return (
     <Container>
       <Title>🌟 오늘의 운세</Title>
@@ -135,11 +150,10 @@ export const TodayFortunePage: React.FC = () => {
         </div>
 
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={birthDate}
             onChange={setBirthDate}
-            placeholder="예: 1990년 1월 1일"
             required
           />
         </div>

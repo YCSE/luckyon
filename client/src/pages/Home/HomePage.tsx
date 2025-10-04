@@ -2,11 +2,9 @@
  * Home Page
  * 6개 운세 서비스 선택 화면
  */
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Header } from '../../components/layout/Header';
-import { HamburgerMenu } from '../../components/layout/HamburgerMenu';
 import cloverImg from '../../assets/6002cc6e75d95c1d74ff91abadefd0ed9f9ca634.png';
 import calendarImg from '../../assets/13a44ddde7bbcd12f6c4ad49848c5ecdbd0c1afd.png';
 import heartImg from '../../assets/5536b38b2e4c3639914ade9678b968db458e7116.png';
@@ -84,63 +82,31 @@ const services: ServiceItem[] = [
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleServiceClick = (path: string) => {
     navigate(path);
   };
 
   return (
-    <PageWrapper>
-      <Container>
-        <Header onMenuClick={() => setMenuOpen(true)} menuButtonRef={menuButtonRef} />
-        <HamburgerMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} menuButtonRef={menuButtonRef} />
-
-        <ServiceList>
-          {services.map((service) => (
-            <ServiceCard key={service.id} onClick={() => handleServiceClick(service.path)}>
-              <ServiceContent>
-                <ServiceTitle>{service.title}</ServiceTitle>
-                <ServiceDescription>{service.description}</ServiceDescription>
-              </ServiceContent>
-              <ServiceImageWrapper
-                width={service.imageWidth}
-                height={service.imageHeight}
-                flip={service.imageFlip}
-              >
-                <ServiceImage src={service.image} alt={service.title} />
-              </ServiceImageWrapper>
-            </ServiceCard>
-          ))}
-        </ServiceList>
-      </Container>
-    </PageWrapper>
+    <ServiceList>
+      {services.map((service) => (
+        <ServiceCard key={service.id} onClick={() => handleServiceClick(service.path)}>
+          <ServiceContent>
+            <ServiceTitle>{service.title}</ServiceTitle>
+            <ServiceDescription>{service.description}</ServiceDescription>
+          </ServiceContent>
+          <ServiceImageWrapper
+            width={service.imageWidth}
+            height={service.imageHeight}
+            flip={service.imageFlip}
+          >
+            <ServiceImage src={service.image} alt={service.title} />
+          </ServiceImageWrapper>
+        </ServiceCard>
+      ))}
+    </ServiceList>
   );
 };
-
-const PageWrapper = styled.div`
-  min-height: 100vh;
-  background: #f8f8f8;
-  display: flex;
-  justify-content: center;
-  padding: 0 420px;
-
-  @media (max-width: 1440px) {
-    padding: 0;
-  }
-`;
-
-const Container = styled.div`
-  width: 600px;
-  min-height: 100vh;
-  background: #ffffff;
-  position: relative;
-
-  @media (max-width: 600px) {
-    width: 100%;
-  }
-`;
 
 const ServiceList = styled.div`
   padding: 30px 30px;

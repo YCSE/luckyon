@@ -3,13 +3,14 @@
  * 결제 생성, 검증, 완료 처리
  */
 import axios from 'axios';
+import * as admin from 'firebase-admin';
 import { db } from '../config/firebase';
 import { AppError } from '../utils/errors';
 import { ErrorCode, SUBSCRIPTION_PRICES, SERVICE_PRICES } from '../config/constants';
 import { generateMerchantUid, generatePaymentId } from '../utils/helpers';
 import { Payment } from '../types';
 import { Timestamp } from 'firebase-admin/firestore';
-import { PORTONE_IMP_CODE, PORTONE_API_SECRET } from '../config/environment';
+import { PORTONE_API_SECRET } from '../config/environment';
 
 interface CreatePaymentData {
   uid: string;
@@ -19,20 +20,21 @@ interface CreatePaymentData {
 }
 
 interface VerifyPaymentData {
-  impUid: string;
+  paymentId: string;  // PortOne V2 paymentId (우리가 요청 시 보낸 merchantUid)
   merchantUid: string;
 }
 
-interface PortOneResponse {
-  code: number;
-  message: string;
-  response: {
-    imp_uid: string;
-    merchant_uid: string;
-    amount: number;
-    status: string;
-    paid_at: number;
+// PortOne V2 Response 타입
+interface PortOneV2PaymentResponse {
+  id: string;
+  storeId: string;
+  orderName: string;
+  amount: {
+    total: number;
+    currency: string;
   };
+  status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | 'PARTIAL_CANCELLED' | 'PAY_PENDING' | 'VIRTUAL_ACCOUNT_ISSUED';
+  paidAt?: string;
 }
 
 export class PaymentService {
@@ -114,7 +116,7 @@ export class PaymentService {
         }
       }
 
-      // 5. 결제 문서 생성
+      // 5. 결제 문서 생성 (merchantUid를 document ID로 사용하여 성능 최적화)
       const now = Timestamp.now();
       const payment: Payment = {
         paymentId,
@@ -131,7 +133,8 @@ export class PaymentService {
         createdAt: now
       };
 
-      await db.collection('payments').doc(paymentId).set(payment);
+      // 결제 문서 생성 (merchantUid를 document ID로 사용)
+      await db.collection('payments').doc(merchantUid).set(payment);
 
       return {
         paymentId,
@@ -152,48 +155,76 @@ export class PaymentService {
    */
   async verifyPayment(data: VerifyPaymentData): Promise<any> {
     try {
-      // 1. 결제 문서 조회
-      const paymentQuery = await db.collection('payments')
-        .where('merchantUid', '==', data.merchantUid)
-        .limit(1)
-        .get();
+      // 1. 결제 문서 조회 (merchantUid로 직접 조회 - 성능 최적화)
+      const paymentDoc = await db.collection('payments').doc(data.merchantUid).get();
 
-      if (paymentQuery.empty) {
+      if (!paymentDoc.exists) {
         throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
       }
 
-      const paymentDoc = paymentQuery.docs[0];
       const payment = paymentDoc.data() as Payment;
 
-      // 2. PortOne API 호출하여 검증
-      const portOneData = await this.getPortOnePayment(data.impUid);
+      // 2. PortOne API 호출하여 결제 상태 조회
+      // paymentId는 클라이언트가 PortOne SDK로부터 받은 응답 (우리의 merchantUid와 동일)
+      const portOnePayment = await this.getPortOnePayment(data.paymentId);
 
-      // 3. merchantUid 일치 확인
-      if (portOneData.merchant_uid !== data.merchantUid) {
-        throw new AppError(ErrorCode.PAY001, 'merchantUid가 일치하지 않습니다.');
+      // 3. paymentId 일치 확인
+      // PortOne V2: 우리가 보낸 paymentId(merchantUid)가 응답의 id 필드에 그대로 반환됨
+      if (portOnePayment.id !== data.merchantUid) {
+        console.error('[PaymentService] Payment ID mismatch:', {
+          expected: data.merchantUid,
+          received: portOnePayment.id,
+          paymentId: data.paymentId
+        });
+        throw new AppError(ErrorCode.PAY001, 'paymentId가 일치하지 않습니다.');
       }
 
       // 4. 금액 일치 확인
-      if (portOneData.amount !== payment.amount) {
+      if (portOnePayment.amount !== payment.amount) {
+        console.error('[PaymentService] Amount mismatch:', {
+          expected: payment.amount,
+          received: portOnePayment.amount
+        });
         throw new AppError(ErrorCode.PAY001, '결제 금액이 일치하지 않습니다.');
       }
 
       // 5. 결제 상태 확인
-      if (portOneData.status !== 'paid') {
-        throw new AppError(ErrorCode.PAY001, '결제가 완료되지 않았습니다.');
+      if (portOnePayment.status !== 'PAID') {
+        console.error('[PaymentService] Invalid payment status:', {
+          status: portOnePayment.status,
+          merchantUid: data.merchantUid
+        });
+        // 상태별 명확한 에러 메시지
+        switch (portOnePayment.status) {
+          case 'READY':
+            throw new AppError(ErrorCode.PAY001, '결제 대기 중입니다.');
+          case 'FAILED':
+            throw new AppError(ErrorCode.PAY001, '결제가 실패했습니다.');
+          case 'CANCELLED':
+            throw new AppError(ErrorCode.PAY001, '결제가 취소되었습니다.');
+          case 'PARTIAL_CANCELLED':
+            throw new AppError(ErrorCode.PAY001, '결제가 부분 취소되었습니다.');
+          case 'PAY_PENDING':
+            throw new AppError(ErrorCode.PAY001, '결제 승인 대기 중입니다.');
+          case 'VIRTUAL_ACCOUNT_ISSUED':
+            throw new AppError(ErrorCode.PAY001, '가상계좌가 발급되었습니다.');
+          default:
+            throw new AppError(ErrorCode.PAY001, `알 수 없는 결제 상태: ${portOnePayment.status}`);
+        }
       }
 
       return {
-        valid: true,
-        impUid: data.impUid,
+        success: true,
+        paymentId: data.paymentId,
         merchantUid: data.merchantUid,
-        amount: portOneData.amount,
-        status: portOneData.status
+        amount: portOnePayment.amount,
+        status: portOnePayment.status
       };
     } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
       }
+      console.error('[PaymentService] Verify payment error:', error);
       throw new AppError(ErrorCode.PAY001, `결제 검증 실패: ${error.message}`);
     }
   }
@@ -201,52 +232,70 @@ export class PaymentService {
   /**
    * 결제 완료 처리
    */
-  async completePayment(impUid: string, merchantUid: string): Promise<any> {
+  async completePayment(paymentId: string, merchantUid: string): Promise<any> {
     try {
-      // 1. 결제 문서 조회
-      const paymentQuery = await db.collection('payments')
-        .where('merchantUid', '==', merchantUid)
-        .limit(1)
-        .get();
+      // Transaction을 사용하여 동시성 제어 및 원자성 보장
+      const result = await db.runTransaction(async (transaction) => {
+        // 1. 결제 문서 조회 (merchantUid로 직접 조회 - 성능 최적화)
+        const paymentRef = db.collection('payments').doc(merchantUid);
+        const paymentDoc = await transaction.get(paymentRef);
 
-      if (paymentQuery.empty) {
-        throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
-      }
+        if (!paymentDoc.exists) {
+          throw new AppError(ErrorCode.PAY001, '결제 정보를 찾을 수 없습니다.');
+        }
 
-      const paymentDoc = paymentQuery.docs[0];
-      const payment = paymentDoc.data() as Payment;
+        const payment = paymentDoc.data() as Payment;
 
-      // 2. 중복 처리 방지
-      if (payment.status === 'completed') {
-        throw new AppError(ErrorCode.PAY002, '이미 처리된 결제입니다.');
-      }
+        // 2. 중복 처리 방지
+        if (payment.status === 'completed') {
+          throw new AppError(ErrorCode.PAY002, '이미 처리된 결제입니다.');
+        }
 
-      const now = Timestamp.now();
+        const now = Timestamp.now();
 
-      // 3. 결제 타입에 따른 처리
-      if (payment.paymentType === 'subscription') {
-        // 구독 처리
-        await this.processSubscription(payment.uid, payment.productType, now);
-      } else {
-        // 일회성 결제는 별도 처리 불필요 (운세 생성 시 결제 확인)
-      }
+        // 3. 결제 타입에 따른 처리
+        if (payment.paymentType === 'subscription') {
+          // 구독 처리 - Transaction 내에서 사용자 문서 업데이트
+          const expiresAt = this.calculateSubscriptionExpiry(payment.productType);
+          console.log(`[PaymentService] Updating subscription for user ${payment.uid}:`, {
+            type: payment.productType,
+            expiresAt
+          });
+          transaction.update(db.collection('users').doc(payment.uid), {
+            currentSubscription: {
+              type: payment.productType,
+              expiresAt
+            },
+            updatedAt: now
+          });
+        } else {
+          // 일회성 결제 - oneTimePurchases 배열에 추가
+          console.log(`[PaymentService] Adding one-time purchase for user ${payment.uid}:`, payment.productType);
+          transaction.update(db.collection('users').doc(payment.uid), {
+            oneTimePurchases: admin.firestore.FieldValue.arrayUnion(payment.productType),
+            updatedAt: now
+          });
+        }
 
-      // 4. 결제 상태 업데이트
-      await db.collection('payments').doc(paymentDoc.id).update({
-        impUid,
-        status: 'completed',
-        completedAt: now,
-        updatedAt: now
+        // 4. 결제 상태 업데이트
+        transaction.update(paymentRef, {
+          impUid: paymentId,  // PortOne V2 paymentId를 impUid 필드에 저장 (기존 스키마 호환성)
+          status: 'completed',
+          completedAt: now,
+          updatedAt: now
+        });
+
+        // 5. 리퍼럴 크레딧 처리는 트리거가 자동 처리
+
+        return {
+          success: true,
+          paymentId: payment.paymentId,
+          paymentType: payment.paymentType,
+          productType: payment.productType
+        };
       });
 
-      // 5. 리퍼럴 크레딧 처리는 트리거가 자동 처리
-
-      return {
-        success: true,
-        paymentId: payment.paymentId,
-        paymentType: payment.paymentType,
-        productType: payment.productType
-      };
+      return result;
     } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
@@ -256,9 +305,9 @@ export class PaymentService {
   }
 
   /**
-   * 구독 처리
+   * 구독 만료일 계산
    */
-  private async processSubscription(uid: string, productType: string, now: Timestamp): Promise<void> {
+  private calculateSubscriptionExpiry(productType: string): Timestamp {
     let days = 0;
     switch (productType) {
       case '1day': days = 1; break;
@@ -268,62 +317,78 @@ export class PaymentService {
         throw new AppError(ErrorCode.SVC003, '유효하지 않은 구독 상품입니다.');
     }
 
-    const expiresAt = Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
-
-    await db.collection('users').doc(uid).update({
-      currentSubscription: {
-        type: productType,
-        expiresAt
-      },
-      updatedAt: now
-    });
+    return Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 
   /**
-   * PortOne API에서 결제 정보 조회
+   * PortOne V2 API에서 결제 정보 조회 (Retry 로직 포함)
    */
-  private async getPortOnePayment(impUid: string): Promise<any> {
-    try {
-      const impCode = PORTONE_IMP_CODE;
-      const apiSecret = PORTONE_API_SECRET;
+  private async getPortOnePayment(paymentId: string, retries = 3): Promise<{
+    id: string;
+    amount: number;
+    status: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | 'PARTIAL_CANCELLED' | 'PAY_PENDING' | 'VIRTUAL_ACCOUNT_ISSUED';
+    paidAt?: number;
+  }> {
+    // 환경변수는 함수 초기화 시점에 검증됨
+    const apiSecret = PORTONE_API_SECRET;
 
-      if (!impCode || !apiSecret) {
-        throw new AppError(ErrorCode.SYS002, 'PortOne API 설정이 누락되었습니다.');
-      }
-
-      // 1. Access Token 발급
-      const tokenResponse = await axios.post<PortOneResponse>(
-        'https://api.iamport.kr/users/getToken',
-        {
-          imp_key: impCode,
-          imp_secret: apiSecret
-        }
-      );
-
-      if (tokenResponse.data.code !== 0) {
-        throw new Error('PortOne 토큰 발급 실패');
-      }
-
-      const accessToken = tokenResponse.data.response;
-
-      // 2. 결제 정보 조회
-      const paymentResponse = await axios.get<PortOneResponse>(
-        `https://api.iamport.kr/payments/${impUid}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // PortOne V2 API: 토큰 발급 없이 직접 인증
+        const paymentResponse = await axios.get<PortOneV2PaymentResponse>(
+          `https://api.portone.io/payments/${paymentId}`,
+          {
+            headers: {
+              Authorization: `PortOne ${apiSecret}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000 // 10초 timeout
           }
+        );
+
+        console.log('[PaymentService] PortOne API response:', {
+          id: paymentResponse.data.id,
+          status: paymentResponse.data.status,
+          amount: paymentResponse.data.amount.total
+        });
+
+        // PortOne V2 응답 구조:
+        // - id: 우리가 요청 시 보낸 paymentId (merchantUid)
+        // - status: READY | PAID | FAILED | CANCELLED 등
+        // - amount.total: 결제 금액
+        return {
+          id: paymentResponse.data.id,
+          amount: paymentResponse.data.amount.total,
+          status: paymentResponse.data.status,
+          paidAt: paymentResponse.data.paidAt ? new Date(paymentResponse.data.paidAt).getTime() / 1000 : undefined
+        };
+      } catch (error: any) {
+        const isLastAttempt = attempt === retries - 1;
+        const is404 = error.response?.status === 404;
+
+        console.error(`[PaymentService] PortOne API error (attempt ${attempt + 1}/${retries}):`, {
+          paymentId,
+          status: error.response?.status,
+          error: error.response?.data || error.message
+        });
+
+        // 404 에러는 재시도하지 않음 (결제 정보 없음)
+        if (is404 || isLastAttempt) {
+          throw new AppError(
+            ErrorCode.SYS002,
+            `PortOne API 오류: ${error.response?.data?.message || error.message}`
+          );
         }
-      );
 
-      if (paymentResponse.data.code !== 0) {
-        throw new Error('PortOne 결제 정보 조회 실패');
+        // 재시도 전 대기 (exponential backoff)
+        const waitTime = 1000 * (attempt + 1);
+        console.log(`[PaymentService] Retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
-
-      return paymentResponse.data.response;
-    } catch (error: any) {
-      throw new AppError(ErrorCode.SYS002, `PortOne API 오류: ${error.message}`);
     }
+
+    // 이 코드에 도달하면 안되지만 TypeScript를 위해 추가
+    throw new AppError(ErrorCode.SYS002, 'PortOne API 호출 실패');
   }
 
   /**

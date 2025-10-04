@@ -52,6 +52,37 @@ export interface PaymentData {
   amount: number;
 }
 
+export interface CreatePaymentResponse {
+  success: boolean;
+  data: {
+    paymentId: string;
+    merchantUid: string;
+    productName: string;
+    amount: number;
+  };
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    paymentId: string;
+    merchantUid: string;
+    amount: number;
+    status: string;
+  };
+}
+
+export interface CompletePaymentResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    paymentId: string;
+    paymentType: 'oneTime' | 'subscription';
+    productType: string;
+  };
+}
+
 // 인증 API
 export const authAPI = {
   signup: async (data: SignupData) => {
@@ -114,21 +145,21 @@ export const fortuneAPI = {
 
 // 결제 API
 export const paymentAPI = {
-  create: async (data: PaymentData) => {
+  create: async (data: PaymentData): Promise<CreatePaymentResponse> => {
     const fn = httpsCallable(functions, 'createPayment');
     const result = await fn(data);
-    return result.data;
+    return result.data as CreatePaymentResponse;
   },
 
-  verify: async (impUid: string, merchantUid: string) => {
+  verify: async (paymentId: string, merchantUid: string): Promise<VerifyPaymentResponse> => {
     const fn = httpsCallable(functions, 'verifyPayment');
-    const result = await fn({ impUid, merchantUid });
-    return result.data;
+    const result = await fn({ paymentId, merchantUid });
+    return result.data as VerifyPaymentResponse;
   },
 
-  complete: async (impUid: string, merchantUid: string) => {
+  complete: async (paymentId: string, merchantUid: string): Promise<CompletePaymentResponse> => {
     const fn = httpsCallable(functions, 'completePayment');
-    const result = await fn({ impUid, merchantUid });
-    return result.data;
+    const result = await fn({ paymentId, merchantUid });
+    return result.data as CompletePaymentResponse;
   }
 };

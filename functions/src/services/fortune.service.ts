@@ -3,7 +3,7 @@
  * 운세 생성 및 관리
  */
 import * as admin from 'firebase-admin';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { db } from '../config/firebase';
 import { AppError } from '../utils/errors';
 import { ErrorCode, CACHE_DURATION, ServiceType } from '../config/constants';
@@ -13,14 +13,16 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { GEMINI_API_KEY } from '../config/environment';
 
 export class FortuneService {
-  private genAI?: GoogleGenerativeAI;
+  private genAI?: GoogleGenAI;
 
-  private getGenAI(): GoogleGenerativeAI {
+  private getGenAI(): GoogleGenAI {
     if (!this.genAI) {
       if (!GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
-      this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      this.genAI = new GoogleGenAI({
+        apiKey: GEMINI_API_KEY
+      });
     }
     return this.genAI;
   }
@@ -47,8 +49,13 @@ export class FortuneService {
       }
     }
 
-    // 2. 일회성 결제 확인 (결제 내역이 있는지 확인)
-    // 여기서는 간단히 false 반환 (실제로는 복잡한 로직 필요)
+    // 2. 일회성 결제 확인
+    if (userData?.oneTimePurchases && Array.isArray(userData.oneTimePurchases)) {
+      if (userData.oneTimePurchases.includes(serviceType)) {
+        return true; // 일회성 구매로 접근 가능
+      }
+    }
+
     return false;
   }
 
@@ -98,14 +105,15 @@ export class FortuneService {
    * 캐시 키 생성
    */
   private generateCacheKey(serviceType: ServiceType, inputData: FortuneRequestData): string {
-    const parts = [serviceType, inputData.name, inputData.birthDate];
+    const parts = [serviceType, inputData.name.trim(), inputData.birthDate.trim()];
 
-    if (inputData.birthTime) parts.push(inputData.birthTime);
-    if (inputData.partnerName) parts.push(inputData.partnerName);
-    if (inputData.partnerBirthDate) parts.push(inputData.partnerBirthDate);
+    // Only add non-empty trimmed values to prevent cache key variations
+    if (inputData.birthTime?.trim()) parts.push(inputData.birthTime.trim());
+    if (inputData.partnerName?.trim()) parts.push(inputData.partnerName.trim());
+    if (inputData.partnerBirthDate?.trim()) parts.push(inputData.partnerBirthDate.trim());
     if (inputData.gender) parts.push(inputData.gender);
     if (inputData.relationshipStatus) parts.push(inputData.relationshipStatus);
-    if (inputData.jobType) parts.push(inputData.jobType);
+    if (inputData.jobType?.trim()) parts.push(inputData.jobType.trim());
     if (inputData.lunarCalendar !== undefined) parts.push(String(inputData.lunarCalendar));
 
     return parts.join('|');
@@ -125,10 +133,27 @@ export class FortuneService {
       const prompt = this.getPrompt(serviceType, inputData);
 
       // 2. Gemini AI 호출
-      const model = this.getGenAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
+      const model = 'gemini-flash-latest';
+      const contents = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: prompt,
+            },
+          ],
+        },
+      ];
+
+      const response = await this.getGenAI().models.generateContentStream({
+        model,
+        contents,
+      });
+
+      let text = '';
+      for await (const chunk of response) {
+        text += chunk.text;
+      }
 
       // 3. 응답 파싱
       const aiResponse = this.parseAIResponse(text);
@@ -153,13 +178,33 @@ export class FortuneService {
    * AI 응답 파싱
    */
   private parseAIResponse(text: string): AIResponse {
-    // HTML 형식으로 반환된다고 가정
-    // 실제로는 더 복잡한 파싱 로직 필요
+    // 마크다운 코드 블록 제거 (```html ... ``` 또는 ``` ... ```)
+    let cleanHtml = text.trim();
+
+    // ```html 또는 ``` 로 시작하는 경우 제거
+    if (cleanHtml.startsWith('```html')) {
+      cleanHtml = cleanHtml.substring(7); // '```html' 제거
+    } else if (cleanHtml.startsWith('```')) {
+      cleanHtml = cleanHtml.substring(3); // '```' 제거
+    }
+
+    // 끝의 ``` 제거
+    if (cleanHtml.endsWith('```')) {
+      cleanHtml = cleanHtml.substring(0, cleanHtml.length - 3);
+    }
+
+    cleanHtml = cleanHtml.trim();
+
+    // <style> 태그와 그 내용 완전히 제거
+    cleanHtml = cleanHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    // <script> 태그와 그 내용도 제거 (보안)
+    cleanHtml = cleanHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
     return {
-      html: text,
-      summary: this.extractSummary(text),
-      luckyItems: this.extractLuckyItems(text),
-      advice: this.extractAdvice(text)
+      html: cleanHtml,
+      summary: this.extractSummary(cleanHtml),
+      luckyItems: this.extractLuckyItems(cleanHtml),
+      advice: this.extractAdvice(cleanHtml)
     };
   }
 
@@ -278,6 +323,7 @@ export class FortuneService {
 **출력 형식:**
 HTML 형식으로 작성하되, 따뜻하고 긍정적인 톤으로 작성해주세요.
 각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+중요: <style>, <script> 태그는 절대 사용하지 마세요. 오직 HTML 태그만 사용하세요.
     `.trim();
   }
 
@@ -373,6 +419,7 @@ HTML 형식으로 작성하되, 전통적이면서도 이해하기 쉬운 톤으
 **출력 형식:**
 HTML 형식으로 작성하되, 따뜻하고 긍정적인 톤으로 작성해주세요.
 각 섹션은 <section> 태그로 구분하고, 제목은 <h2> 태그를 사용하세요.
+중요: <style>, <script> 태그는 절대 사용하지 마세요. 오직 HTML 태그만 사용하세요.
     `.trim();
   }
 

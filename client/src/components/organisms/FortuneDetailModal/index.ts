@@ -1,0 +1,1 @@
+export { FortuneDetailModal } from './FortuneDetailModal';

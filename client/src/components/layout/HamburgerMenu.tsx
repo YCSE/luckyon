@@ -85,8 +85,8 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({ isOpen, onClose, m
     <>
       <Overlay onClick={onClose} />
       <MenuContainer ref={menuRef} $top={position.top} $right={position.right}>
-        <MenuItem onClick={() => handleNavigate('/profile')}>
-          개인 정보 관리
+        <MenuItem onClick={() => handleNavigate('/mypage')}>
+          마이페이지
         </MenuItem>
         <MenuItem onClick={() => handleNavigate('/pricing')}>
           결제 관리

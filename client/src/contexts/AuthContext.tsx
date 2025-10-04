@@ -19,6 +19,8 @@ interface AuthContextType {
   signup: (data: SignupData) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  checkServiceAccess: (serviceType: string) => boolean;
+  refreshUserInfo: () => Promise<void>;
 }
 
 interface UserInfo {
@@ -28,6 +30,11 @@ interface UserInfo {
   memberGrade: string;
   referralCode: string;
   creditBalance: number;
+  currentSubscription?: {
+    type: string;
+    expiresAt: Date;
+  };
+  oneTimePurchases?: string[];
 }
 
 interface SignupData {
@@ -120,6 +127,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const refreshUserInfo = async () => {
+    if (user) {
+      // Custom claims가 업데이트된 경우에만 강제 refresh 필요
+      // 일반적인 경우 캐시된 토큰 사용으로 성능 개선
+      const idToken = await user.getIdToken();
+      try {
+        const response: any = await authAPI.verifyToken(idToken);
+        if (response.success) {
+          console.log('[AuthContext] User info refreshed:', response.data);
+          setUserInfo(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to refresh user info:', error);
+      }
+    }
+  };
+
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
@@ -131,13 +155,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const checkServiceAccess = (serviceType: string): boolean => {
+    console.log('[AuthContext] Checking service access:', {
+      serviceType,
+      userInfo,
+      hasSubscription: !!userInfo?.currentSubscription,
+      oneTimePurchases: userInfo?.oneTimePurchases
+    });
+
+    if (!userInfo) {
+      console.log('[AuthContext] No userInfo, access denied');
+      return false;
+    }
+
+    // 구독 확인
+    if (userInfo.currentSubscription) {
+      const expiresAt = userInfo.currentSubscription.expiresAt instanceof Date
+        ? userInfo.currentSubscription.expiresAt
+        : new Date(userInfo.currentSubscription.expiresAt);
+      console.log('[AuthContext] Subscription check:', { expiresAt, now: new Date() });
+      if (expiresAt > new Date()) {
+        console.log('[AuthContext] Access granted via subscription');
+        return true;
+      }
+    }
+
+    // 일회성 구매 확인
+    if (userInfo.oneTimePurchases?.includes(serviceType)) {
+      console.log('[AuthContext] Access granted via one-time purchase');
+      return true;
+    }
+
+    console.log('[AuthContext] Access denied');
+    return false;
+  };
+
   const value: AuthContextType = {
     user,
     userInfo,
     loading,
     signup,
     login,
-    logout
+    logout,
+    checkServiceAccess,
+    refreshUserInfo
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

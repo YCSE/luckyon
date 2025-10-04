@@ -8,7 +8,8 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
-import { DateInput } from '../../components/atoms/DateInput';
+import { BirthDateInput } from '../../components/atoms/BirthDateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -62,7 +63,7 @@ const ErrorMessage = styled.div`
 `;
 
 export const WealthPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [jobType, setJobType] = useState('');
@@ -91,6 +92,19 @@ export const WealthPage: React.FC = () => {
     return <Container><Title>로그인이 필요합니다</Title></Container>;
   }
 
+  // 결제 확인
+  if (!checkServiceAccess('wealth')) {
+    return (
+      <PaymentRequired
+        serviceName="재물운"
+        productType="wealth"
+        oneTimePrice={5900}
+        oneTimeDescription="금전 운세를 봅니다"
+        oneTimeFeatures={['24시간 캐시', '직업별 맞춤 분석', '투자운']}
+      />
+    );
+  }
+
   return (
     <Container>
       <Title>💰 재물운</Title>
@@ -101,11 +115,11 @@ export const WealthPage: React.FC = () => {
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={birthDate}
             onChange={setBirthDate}
-            placeholder="예: 1990년 1월 1일"
+            
             required
           />
         </div>

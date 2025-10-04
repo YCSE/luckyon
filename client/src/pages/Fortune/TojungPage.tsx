@@ -8,7 +8,8 @@ import { fortuneAPI } from '../../services/api';
 import { tokens } from '../../design-system/tokens';
 import { Button } from '../../components/atoms/Button';
 import { Input } from '../../components/atoms/Input';
-import { DateInput } from '../../components/atoms/DateInput';
+import { BirthDateInput } from '../../components/atoms/BirthDateInput';
+import { PaymentRequired } from '../../components/organisms/PaymentRequired';
 
 const Container = styled.div`
   max-width: 800px;
@@ -69,7 +70,7 @@ const ErrorMessage = styled.div`
 `;
 
 export const TojungPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkServiceAccess } = useAuth();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [lunarCalendar, setLunarCalendar] = useState(false);
@@ -106,6 +107,19 @@ export const TojungPage: React.FC = () => {
     );
   }
 
+  // 결제 확인
+  if (!checkServiceAccess('tojung')) {
+    return (
+      <PaymentRequired
+        serviceName="토정비결"
+        productType="tojung"
+        oneTimePrice={7900}
+        oneTimeDescription="한 해의 운세를 봅니다"
+        oneTimeFeatures={['365일 캐시', '연간 운세', '월별 운세']}
+      />
+    );
+  }
+
   return (
     <Container>
       <Title>☀️ 토정비결</Title>
@@ -123,11 +137,11 @@ export const TojungPage: React.FC = () => {
         </div>
 
         <div>
-          <DateInput
+          <BirthDateInput
             label="생년월일"
             value={birthDate}
             onChange={setBirthDate}
-            placeholder="예: 1990년 1월 1일"
+            
             required
           />
         </div>

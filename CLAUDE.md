@@ -1,386 +1,349 @@
-# LuckyOn - AI 운세 서비스 플랫폼
+# CLAUDE.md
 
-## 프로젝트 개요
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-LuckyOn은 Google Gemini AI를 활용한 종합 운세 서비스 플랫폼입니다. Firebase Functions V2 기반의 100% 서버리스 아키텍처로 구축되며, 6가지 운세 서비스와 리퍼럴 시스템을 제공합니다.
+## Project Overview
 
-### 핵심 기능
-- **6개 운세 서비스**: 오늘의 운세, 사주팔자, 토정비결, 궁합, 재물운, 연애운
-- **결제 시스템**: 일회성 결제 + 기간제 구독 (1일/7일/30일)
-- **회원 등급**: admin, member, regular, special
-- **리퍼럴 시스템**: 등급별 차등 수익률 (회원 0%, 정회원 50%, 특별회원 70%)
+LuckyOn is an AI-powered fortune-telling service platform built with:
+- **Backend**: Firebase Functions V2 (100% serverless, TypeScript)
+- **Frontend**: React 18 + TypeScript + styled-components
+- **AI**: Google Gemini API for fortune generation
+- **Payment**: PortOne V2 payment gateway
+- **Region**: asia-northeast3 (Seoul) for all Firebase resources
 
-## 프로젝트 구조
+## Critical Architecture Decisions
 
-```
-luckyon/
-├── CLAUDE.md                 # 프로젝트 전체 가이드 (현재 문서)
-├── COMPONENTS.md             # 프론트엔드 컴포넌트 가이드 (SSOT)
-├── FUNCTIONS.md              # 모든 Firebase Functions 정의 (SSOT)
-├── .env.local               # 로컬 환경변수
-├── .env.production          # 프로덕션 환경변수
-├── firebase.json            # Firebase 설정
-├── firestore.rules          # Firestore 보안 규칙
-├── firestore.indexes.json   # Firestore 인덱스 정의
-├── functions/               # Firebase Functions
-│   ├── CLAUDE.md           # Functions 구현 가이드
-│   ├── package.json        # Functions 의존성
-│   ├── tsconfig.json       # TypeScript 설정
-│   ├── .env.local         # Functions 로컬 환경변수
-│   ├── .env.production    # Functions 프로덕션 환경변수
-│   └── src/
-│       ├── index.ts       # Functions 진입점
-│       ├── config/        # 설정 관리
-│       ├── services/      # 비즈니스 로직
-│       ├── utils/         # 유틸리티 함수
-│       ├── types/         # TypeScript 타입 정의
-│       └── prompts/       # AI 프롬프트 템플릿
-├── client/                  # React 클라이언트
-│   ├── package.json
-│   ├── src/
-│   │   ├── components/    # Atomic Design 패턴 컴포넌트
-│   │   ├── pages/         # 페이지 컴포넌트
-│   │   ├── contexts/      # React Context
-│   │   ├── services/      # API 호출 로직
-│   │   ├── design-system/ # 디자인 토큰
-│   │   └── utils/         # 유틸리티 함수
-│   └── public/
-└── docs/                    # 추가 문서
-```
+### 1. Race Condition Prevention (Payment & Fortune Access)
 
-## Firebase 프로젝트 설정
+**Problem Solved**: Users could exploit one-time purchases by making concurrent requests.
 
-### 1. Firebase 프로젝트 생성
+**Solution**: Transaction-based atomic operations in `/functions/src/index.ts`
 
-```bash
-# Firebase CLI 설치
-npm install -g firebase-tools
+```typescript
+// ALWAYS use checkAndReserveOneTimePurchase() for fortune generation
+// This atomically checks AND removes the purchase in a single transaction
+const accessType = await checkAndReserveOneTimePurchase(uid, serviceType);
 
-# Firebase 로그인
-firebase login
-
-# 프로젝트 초기화
-firebase init
-```
-
-선택 옵션:
-- Firestore
-- Functions (TypeScript)
-- Hosting
-- Emulators
-
-### 2. 프로젝트 ID 설정
-
-각 환경별 프로젝트 ID:
-- **Development**: `dev-luckyon`
-- **Staging**: `staging-luckyon`
-- **Production**: `luckyon`
-
-```bash
-# 프로젝트 별칭 설정
-firebase use --add dev-luckyon --alias development
-firebase use --add staging-luckyon --alias staging
-firebase use --add luckyon --alias production
-```
-
-### 3. 환경변수 설정
-
-`.env.local` (개발 환경):
-```env
-# Firebase Config
-FIREBASE_PROJECT_ID=dev-luckyon
-FIREBASE_API_KEY=your-api-key
-FIREBASE_AUTH_DOMAIN=dev-luckyon.firebaseapp.com
-FIREBASE_STORAGE_BUCKET=dev-luckyon.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-FIREBASE_APP_ID=your-app-id
-
-# External APIs
-GEMINI_API_KEY=your-gemini-api-key
-PORTONE_IMP_CODE=your-portone-imp-code
-PORTONE_API_SECRET=your-portone-api-secret
-
-# Functions Region
-FUNCTIONS_REGION=asia-northeast3
-```
-
-### 4. Functions 환경변수 설정
-
-```bash
-# Functions 환경변수 설정 (프로덕션)
-firebase functions:config:set \
-  gemini.api_key="your-gemini-api-key" \
-  portone.imp_code="your-portone-imp-code" \
-  portone.api_secret="your-portone-api-secret" \
-  system.region="asia-northeast3"
-```
-
-## 개발 환경 구성
-
-### 1. 의존성 설치
-
-```bash
-# 프로젝트 루트
-npm install
-
-# Functions 의존성
-cd functions
-npm install
-```
-
-### 2. 로컬 에뮬레이터 실행
-
-```bash
-# Firebase 에뮬레이터 시작
-firebase emulators:start
-
-# 특정 서비스만 실행
-firebase emulators:start --only functions,firestore
-```
-
-에뮬레이터 포트:
-- Firestore: 8080
-- Functions: 5001
-- Auth: 9099
-- Hosting: 5000
-- UI: 4000
-
-### 3. TypeScript 컴파일
-
-```bash
-cd functions
-npm run build       # TypeScript 컴파일
-npm run watch      # 변경 감지 모드
-```
-
-## Firestore 컬렉션 스키마
-
-주요 컬렉션:
-- `users`: 사용자 정보 및 등급
-- `payments`: 결제 내역
-- `fortune_results`: 운세 결과 캐시
-- `subscriptions`: 구독 정보
-- `referral_credits`: 리퍼럴 크레딧
-- `withdrawal_requests`: 출금 요청
-- `system_config`: 시스템 설정
-
-상세 스키마는 [functions/CLAUDE.md](./functions/CLAUDE.md#firestore-collections) 참조
-
-## Firebase Functions 구현
-
-모든 Functions는 V2로 구현되며, 상세 정의는 [FUNCTIONS.md](./FUNCTIONS.md)를 참조합니다.
-
-### 함수 카테고리
-1. **인증 관련**: authSignup, authLogin, authVerifyToken
-2. **운세 생성**: generateFortune, generateTodayFortune 등 7개
-3. **결제 관련**: createPayment, verifyPayment, completePayment 등
-4. **리퍼럴 관련**: getReferralStats, processReferralCredit 등
-5. **관리자**: updateSystemConfig, getUsersList, updateUserGrade 등
-6. **예약 작업**: cleanupExpiredSubscriptions, dailyAnalyticsReport 등
-7. **트리거**: onUserCreate, onPaymentComplete, onSubscriptionExpire
-
-구현 가이드는 [functions/CLAUDE.md](./functions/CLAUDE.md) 참조
-
-## 배포 프로세스
-
-### 1. 개발 환경 테스트
-
-```bash
-# 로컬 테스트
-npm run test
-
-# Functions 테스트
-cd functions
-npm run test
-```
-
-### 2. 스테이징 배포
-
-```bash
-# 스테이징 환경 선택
-firebase use staging
-
-# Functions 배포
-firebase deploy --only functions
-
-# 전체 배포
-firebase deploy
-```
-
-### 3. 프로덕션 배포
-
-```bash
-# 프로덕션 환경 선택
-firebase use production
-
-# 프로덕션 배포 (Blue-Green)
-firebase deploy --only functions:generateFortune
-firebase deploy --only functions
-```
-
-### 4. 롤백
-
-```bash
-# Functions 버전 확인
-firebase functions:log
-
-# 이전 버전으로 롤백
-firebase functions:delete functionName
-firebase deploy --only functions:functionName
-```
-
-## 보안 설정
-
-### Firestore Security Rules
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // users: 본인 데이터만 읽기
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // Functions만 쓰기 가능
-    }
-
-    // payments: Functions만 접근
-    match /payments/{document=**} {
-      allow read, write: if false;
-    }
-
-    // fortune_results: 본인 데이터만 읽기
-    match /fortune_results/{resultId} {
-      allow read: if request.auth != null &&
-        request.auth.uid == resource.data.uid;
-      allow write: if false;
-    }
-
-    // system_config: 인증된 사용자 읽기, admin만 쓰기
-    match /system_config/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.memberGrade == 'admin';
-    }
-  }
+// If generation fails, restore the purchase
+if (error) {
+  await restoreOneTimePurchase(uid, serviceType);
 }
 ```
 
-## 모니터링
+**Files**: All fortune generation functions (`generateTodayFortune`, `generateSajuAnalysis`, etc.)
 
-### 1. Firebase Console 모니터링
-- Functions 로그: Firebase Console > Functions > Logs
-- Firestore 사용량: Firebase Console > Firestore > Usage
-- 성능 모니터링: Firebase Console > Performance
+### 2. Payment Completion Defense-in-Depth
 
-### 2. 커스텀 모니터링
-- 에러율 추적
-- 응답시간 측정
-- 일일 통계 리포트
+**Dual-path architecture** ensures payment completion even if client disconnects:
 
-## 개발 우선순위
+1. **Client path**: User completes payment → `verifyPayment` → `completePayment`
+2. **Webhook path** (backup): PortOne V2 webhook → `portoneWebhook` → `completePayment`
 
-### Phase 1 (2주) - 기반 구축
-- [ ] Firebase 프로젝트 설정
-- [ ] 인증 시스템 (authSignup, authLogin, authVerifyToken)
-- [ ] 오늘의 운세 서비스 (generateTodayFortune)
-- [ ] 기간제 결제 시스템
+**Critical**: `completePayment` uses Firestore Transactions with duplicate prevention (PAY002 error code).
 
-### Phase 2 (2주) - 서비스 확장
-- [ ] 5개 추가 운세 서비스 구현
-- [ ] 일회성 결제 시스템
-- [ ] 회원 등급 시스템
+**Webhook Configuration** (PortOne Console):
+- Version: 2024-04-25 (V2)
+- URL: `https://asia-northeast3-luckyon-6be9e.cloudfunctions.net/portoneWebhook`
+- Event: Transaction.Paid
+- Signature verification: Standard Webhooks HMAC SHA-256
 
-### Phase 3 (1주) - 수익화 기능
-- [ ] 리퍼럴 시스템
-- [ ] 크레딧 및 출금 기능
-- [ ] 관리자 대시보드
+### 3. Document Structure (SSOT - Single Source of Truth)
 
-### Phase 4 (1주) - 마무리
-- [ ] 통합 테스트
-- [ ] 성능 최적화
-- [ ] 프로덕션 배포
+- **FUNCTIONS.md**: Function definitions (name, params, returns, config)
+- **COMPONENTS.md**: Frontend components, design tokens, patterns
+- **functions/CLAUDE.md**: Implementation details for Functions
 
-## 프론트엔드 개발
+**NEVER implement Functions without checking FUNCTIONS.md first.**
 
-### 기술 스택
-- React 18 + TypeScript
-- styled-components
-- React Router v6
-- Firebase SDK
-- Atomic Design 패턴
+## Development Commands
 
-### 개발 가이드
-
-**중요**: 모든 프론트엔드 작업은 [COMPONENTS.md](./COMPONENTS.md)를 참조해야 합니다.
-
-COMPONENTS.md는 프론트엔드 개발의 **단일 진실의 원천(SSOT)** 이며, 다음 내용을 포함합니다:
-- 디자인 시스템 토큰 (색상, 타이포그래피, 간격 등)
-- Atomic Design 패턴 구조
-- styled-components 스타일링 가이드
-- 컴포넌트 작성 규칙
-- 페이지 구조 분석
-- API 호출 패턴
-- 폼 처리 패턴
-- 날짜 처리 (한국 형식)
-- 에러 처리 및 접근성
-
-### 클라이언트 실행
+### Firebase Functions
 
 ```bash
+# Working directory: /functions
+cd functions
+
+# Build TypeScript
+npm run build
+
+# Watch mode (auto-rebuild on changes)
+npm run watch
+
+# Deploy all functions
+cd .. && firebase deploy --only functions
+
+# Deploy specific function
+firebase deploy --only functions:portoneWebhook
+
+# View logs
+firebase functions:log
+firebase functions:log --only portoneWebhook
+
+# Cloud Logging (more detailed)
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="functionname"' --limit 30
+```
+
+### Frontend Client
+
+```bash
+# Working directory: /client
 cd client
-npm install
-npm run dev        # 개발 서버 시작 (포트 3000)
-npm run build      # 프로덕션 빌드
-npm run preview    # 빌드 미리보기
+
+# Development server (default port 3000)
+npm run dev
+
+# Alternative port
+PORT=3001 npm run dev
+
+# Production build
+npm run build
 ```
 
-### 컴포넌트 작성 체크리스트
+### Firebase Project Management
 
-새로운 컴포넌트를 만들 때:
-- [ ] [COMPONENTS.md](./COMPONENTS.md) 가이드 준수
-- [ ] TypeScript 인터페이스 정의
-- [ ] 디자인 토큰 사용 (하드코딩 금지)
-- [ ] Atomic Design 패턴 따르기
-- [ ] 반응형 디자인 적용
-- [ ] 접근성 고려
-- [ ] 에러 처리 구현
-- [ ] 한국 날짜 형식 사용 (yyyy년 m월 d일)
-
-## 참고 문서
-
-- **프론트엔드 컴포넌트 가이드**: [COMPONENTS.md](./COMPONENTS.md) ⭐
-- **Functions 구현 가이드**: [functions/CLAUDE.md](./functions/CLAUDE.md)
-- **Functions 정의 명세**: [FUNCTIONS.md](./FUNCTIONS.md)
-- **기술 기획서**: 프로젝트 문서 참조
-
-## 문제 해결
-
-### Functions 배포 실패
 ```bash
-# 로그 확인
-firebase functions:log --only functionName
+# Current project
+firebase projects:list
 
-# 환경변수 확인
-firebase functions:config:get
+# Switch environment
+firebase use production  # luckyon-6be9e
+firebase use staging     # staging-luckyon (if configured)
 ```
 
-### Firestore 권한 오류
-- Security Rules 확인
-- 인증 토큰 유효성 확인
-- 사용자 등급 확인
+## Environment Variables
 
-### 외부 API 연동 실패
-- API 키 환경변수 확인
-- Rate Limit 확인
-- 네트워크 타임아웃 설정
+### Functions (.env in /functions directory)
 
-## 연락처
+```env
+GEMINI_API_KEY=<Google Gemini API key>
+PORTONE_STORE_ID=store-XXXXXXXX
+PORTONE_API_SECRET=<PortOne API secret>
+PORTONE_WEBHOOK_SECRET=whsec_XXXXXXXXXX
+FUNCTIONS_REGION=asia-northeast3
+```
 
-프로젝트 관련 문의사항은 프로젝트 매니저에게 연락 바랍니다.
+**Critical**: Firebase Functions V2 reads from `.env` file (not `firebase functions:config`).
 
----
+## Payment Flow Architecture
 
-**주의**: 이 문서는 프로젝트 전체 개요를 제공합니다. 구체적인 구현은 하위 문서들을 참조하세요.
-- **프론트엔드 개발**: [COMPONENTS.md](./COMPONENTS.md) ⭐
-- **Functions 구현**: [functions/CLAUDE.md](./functions/CLAUDE.md)
-- **Functions 정의**: [FUNCTIONS.md](./FUNCTIONS.md)
+### PortOne V2 Integration
+
+**merchantUid format**: `LUCKY_YYYYMMDD_XXXXXX` (nanoid for random part)
+
+**Complete flow**:
+1. Client: `createPayment()` → get merchantUid
+2. Client: Load PortOne SDK → open payment window
+3. User: Complete payment
+4. Client: `verifyPayment(paymentId, merchantUid)` → verify with PortOne API
+5. Client: `completePayment(paymentId, merchantUid)` → grant access
+6. **Backup**: PortOne webhook → `portoneWebhook` → `completePayment()`
+
+**Key insight**: Step 6 ensures payment is completed even if user closes browser between steps 4-5.
+
+## Frontend Design System
+
+**All styling MUST use design tokens** from `/client/src/design-system/tokens/index.ts`.
+
+```typescript
+import { tokens } from '../design-system/tokens';
+
+// ✅ Correct
+const Button = styled.button`
+  color: ${tokens.colors.primary[500]};
+  padding: ${tokens.spacing[4]};
+  border-radius: ${tokens.borderRadius.md};
+`;
+
+// ❌ Wrong (hardcoded values)
+const Button = styled.button`
+  color: #E56030;
+  padding: 16px;
+  border-radius: 12px;
+`;
+```
+
+**Atomic Design structure**:
+- `/components/atoms/` - Basic elements (Button, Input)
+- `/components/molecules/` - Composed elements (FortuneServiceCard)
+- `/components/organisms/` - Complex sections (Header, Footer)
+- `/components/layout/` - Layout components
+- `/pages/` - Full pages
+
+**Korean date format**: Always use `yyyy년 m월 d일` via `/client/src/utils/date.ts` utilities.
+
+## Firebase Functions V2 Patterns
+
+### Function Definition Template
+
+```typescript
+export const functionName = onCall({
+  region: 'asia-northeast3',  // ALWAYS Seoul
+  memory: '2GiB',
+  concurrency: 100,
+  maxInstances: 20,
+  timeoutSeconds: 60
+}, async (request) => {
+  // 1. Auth check
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'AUTH001');
+  }
+
+  // 2. Validate input
+  const { param1, param2 } = request.data;
+
+  // 3. Business logic
+  try {
+    const result = await serviceFunction(param1, param2);
+    return { success: true, data: result };
+  } catch (error: any) {
+    logError('functionName', error, request.data);
+    throw toHttpsError(error);
+  }
+});
+```
+
+### HTTP Endpoints (onRequest)
+
+```typescript
+export const httpEndpoint = onRequest({
+  region: 'asia-northeast3',
+  memory: '2GiB',
+  cors: true,
+  timeoutSeconds: 30
+}, async (request, response) => {
+  try {
+    // Handle request
+    response.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('[EndpointName] Error:', error);
+    response.status(500).json({ error: 'Internal server error' });
+  }
+});
+```
+
+## Firestore Security Patterns
+
+**Critical principle**: Functions write, clients read (with restrictions).
+
+```javascript
+// Users can read only their own data
+match /users/{userId} {
+  allow read: if request.auth != null && request.auth.uid == userId;
+  allow write: if false;  // Only Functions can write
+}
+
+// Payments are completely private
+match /payments/{paymentId} {
+  allow read, write: if false;  // Only Functions access
+}
+
+// Fortune results: own data only
+match /fortune_results/{resultId} {
+  allow read: if request.auth != null &&
+    request.auth.uid == resource.data.uid;
+  allow write: if false;
+}
+```
+
+## Common Debugging Workflows
+
+### Webhook Not Working
+
+1. Check webhook version in PortOne console (must be V2: 2024-04-25)
+2. Verify environment variable: `PORTONE_WEBHOOK_SECRET` in `/functions/.env`
+3. Check Cloud Logging:
+   ```bash
+   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="portonewebhook"' --limit 30
+   ```
+4. Look for `[WebhookVerify]` logs showing signature validation
+5. Verify webhook body format: must have `type` and `data` fields (V2 format)
+
+### Payment Not Completing
+
+1. Check payment document status in Firestore `/payments/{paymentId}`
+2. Verify `completePayment` was called (check logs)
+3. Check for PAY002 error (duplicate completion - this is OK)
+4. Verify user document updated with subscription or oneTimePurchases
+
+### Fortune Generation Fails
+
+1. Check access rights: subscription valid OR one-time purchase exists
+2. Verify Gemini API key in environment
+3. Check cache first: may already exist in `fortune_results` collection
+4. Look for rollback logs if one-time purchase was restored
+
+## Testing
+
+### Local Emulator
+
+```bash
+# Start emulators
+firebase emulators:start
+
+# Emulator ports
+# - Firestore: 8080
+# - Functions: 5001
+# - Auth: 9099
+# - UI: 4000
+```
+
+### Manual API Testing
+
+```bash
+# Test webhook endpoint
+curl -X POST https://asia-northeast3-luckyon-6be9e.cloudfunctions.net/portoneWebhook \
+  -H "Content-Type: application/json" \
+  -H "webhook-id: test-123" \
+  -H "webhook-timestamp: 1234567890" \
+  -H "webhook-signature: v1,signature" \
+  -d '{"type":"Transaction.Paid","data":{"paymentId":"test-payment-id"}}'
+```
+
+## Key Files Reference
+
+### Backend
+- `/functions/src/index.ts` - All Functions entry point
+- `/functions/src/services/payment.service.ts` - Payment logic (Transaction-based)
+- `/functions/src/services/fortune.service.ts` - AI fortune generation
+- `/functions/src/config/environment.ts` - Environment variables
+- `/functions/src/utils/errors.ts` - Error codes (AUTH001, PAY001, etc.)
+
+### Frontend
+- `/client/src/pages/` - Page components
+- `/client/src/components/` - Atomic design components
+- `/client/src/design-system/tokens/index.ts` - Design tokens (SSOT for styling)
+- `/client/src/services/api.ts` - Firebase Functions calls
+- `/client/src/config/firebase.ts` - Firebase initialization
+
+### Configuration
+- `/firebase.json` - Firebase project config
+- `/firestore.rules` - Security rules
+- `/firestore.indexes.json` - Firestore indexes
+- `/.env` - Root environment variables
+- `/functions/.env` - Functions environment variables
+
+## Error Codes
+
+Quick reference for error handling:
+
+- **AUTH001-004**: Authentication/authorization errors
+- **PAY001-004**: Payment processing errors (PAY002 = duplicate, OK to ignore)
+- **SVC001-004**: Service/business logic errors
+- **SYS001-004**: System/infrastructure errors
+
+## Critical Implementation Notes
+
+1. **Always use Firestore Transactions** for operations that must be atomic (payments, one-time purchases)
+2. **PortOne V2 only** - No V1 compatibility
+3. **Design tokens mandatory** - Never hardcode colors/spacing in frontend
+4. **Seoul region (asia-northeast3)** - All Firebase resources
+5. **Webhook signature verification** - Uses Standard Webhooks spec with HMAC SHA-256
+6. **merchantUid format** - Must be `LUCKY_YYYYMMDD_XXXXXX`
+7. **Korean dates** - Always `yyyy년 m월 d일` format in UI
+
+## Reference Documentation
+
+- **Function Specifications**: [FUNCTIONS.md](./FUNCTIONS.md)
+- **Component Guide**: [COMPONENTS.md](./COMPONENTS.md)
+- **Functions Implementation**: [functions/CLAUDE.md](./functions/CLAUDE.md)

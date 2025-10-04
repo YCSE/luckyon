@@ -1,17 +1,24 @@
 {
   "mcpServers": {
-    "Figma": {
-      "url": "http://127.0.0.1:3845/sse"
+    "figma-dev-mode-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "figma-dev-mode-mcp-server"]
     },
     "portone-mcp-server": {
       "command": "npx",
       "args": ["-y", "@portone/mcp-server@latest"]
     },
-       "playwright": {
+    "playwright": {
       "command": "npx",
-      "args": [
-        "@playwright/mcp@latest"
-      ]
+      "args": ["@playwright/mcp@latest"]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@context7/mcp-server@latest"]
     }
   }
 }

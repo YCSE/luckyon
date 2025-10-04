@@ -39,6 +39,8 @@ const Container = styled.header`
 
 const LogoImage = styled.img`
   height: 20px;
+  aspect-ratio: 102.18 / 20.00;
+  object-fit: contain;
   cursor: pointer;
 
   &:hover {
