@@ -771,12 +771,19 @@ export const portoneWebhook = onRequest({
     }
     console.log('[PortOneWebhook] === DEBUG END ===');
 
-    // Webhook signature 검증 (임시로 비활성화하여 테스트)
+    // Webhook signature 검증
     const { PORTONE_WEBHOOK_SECRET } = await import('./config/environment');
-    if (PORTONE_WEBHOOK_SECRET && false) { // 임시로 false 추가
-      // Firebase Functions의 rawBody 사용 (원본 body bytes)
-      const rawBody = (request as any).rawBody?.toString('utf-8') || JSON.stringify(request.body);
-      console.log('[PortOneWebhook] Using rawBody for signature verification');
+    if (PORTONE_WEBHOOK_SECRET) {
+      // rawBody 추출: Buffer -> string
+      let rawBody: string;
+
+      if ((request as any).rawBody && Buffer.isBuffer((request as any).rawBody)) {
+        rawBody = (request as any).rawBody.toString('utf-8');
+      } else {
+        // rawBody가 Buffer가 아니면 JSON.stringify 사용 (fallback)
+        rawBody = JSON.stringify(request.body);
+        console.warn('[PortOneWebhook] rawBody is not a Buffer, using JSON.stringify as fallback');
+      }
 
       const isValid = verifyWebhookSignature(
         PORTONE_WEBHOOK_SECRET,
@@ -791,14 +798,14 @@ export const portoneWebhook = onRequest({
       }
       console.log('[PortOneWebhook] Signature verified successfully');
     } else {
-      console.warn('[PortOneWebhook] Webhook signature verification DISABLED for debugging');
+      console.warn('[PortOneWebhook] Webhook secret not set, skipping verification');
     }
 
-    // Webhook body 파싱
+    // Webhook body 파싱 (V2 형식만 지원)
     const webhookBody = request.body;
     console.log('[PortOneWebhook] Received webhook:', JSON.stringify(webhookBody));
 
-    // Webhook 타입 확인 (2024-04-25 버전)
+    // Webhook 타입 확인 (V2: 2024-04-25 버전)
     if (!webhookBody || typeof webhookBody !== 'object') {
       console.error('[PortOneWebhook] Invalid webhook body');
       response.status(400).json({ error: 'Invalid webhook body' });
@@ -806,6 +813,12 @@ export const portoneWebhook = onRequest({
     }
 
     const { type, data } = webhookBody;
+
+    if (!type || !data) {
+      console.error('[PortOneWebhook] Missing type or data field - V2 format required');
+      response.status(400).json({ error: 'V2 webhook format required' });
+      return;
+    }
 
     // Transaction.Paid 이벤트만 처리
     if (type === 'Transaction.Paid') {
