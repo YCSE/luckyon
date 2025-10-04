@@ -116,7 +116,7 @@ export const LovePage: React.FC = () => {
         productType="love"
         oneTimePrice={6900}
         oneTimeDescription="연애 운세를 봅니다"
-        oneTimeFeatures={['24시간 캐시', '상태별 맞춤 분석', '이상형 분석']}
+        oneTimeFeatures={['1회 이용', '상태별 맞춤 분석', '이상형 분석']}
       />
     );
   }

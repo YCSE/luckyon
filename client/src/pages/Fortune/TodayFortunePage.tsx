@@ -128,7 +128,7 @@ export const TodayFortunePage: React.FC = () => {
         productType="today"
         oneTimePrice={SERVICE_PRICES.today}
         oneTimeDescription={SERVICE_DESCRIPTIONS.today}
-        oneTimeFeatures={['6시간 캐시', '종합운/사랑운/재물운/건강운']}
+        oneTimeFeatures={['1회 이용', '종합운/사랑운/재물운/건강운']}
       />
     );
   }

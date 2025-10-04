@@ -110,7 +110,7 @@ export const SajuPage: React.FC = () => {
         productType="saju"
         oneTimePrice={9900}
         oneTimeDescription="평생 사주를 분석합니다"
-        oneTimeFeatures={['30일 캐시', '생시 기반 정밀 분석', '사주 해석']}
+        oneTimeFeatures={['1회 이용', '생시 기반 정밀 분석', '사주 해석']}
       />
     );
   }

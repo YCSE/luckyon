@@ -100,7 +100,7 @@ export const WealthPage: React.FC = () => {
         productType="wealth"
         oneTimePrice={5900}
         oneTimeDescription="금전 운세를 봅니다"
-        oneTimeFeatures={['24시간 캐시', '직업별 맞춤 분석', '투자운']}
+        oneTimeFeatures={['1회 이용', '직업별 맞춤 분석', '투자운']}
       />
     );
   }

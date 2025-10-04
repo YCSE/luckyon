@@ -108,7 +108,7 @@ export const CompatibilityPage: React.FC = () => {
         productType="compatibility"
         oneTimePrice={12900}
         oneTimeDescription="두 사람의 궁합을 봅니다"
-        oneTimeFeatures={['7일 캐시', '사랑 궁합', '결혼 궁합']}
+        oneTimeFeatures={['1회 이용', '사랑 궁합', '결혼 궁합']}
       />
     );
   }

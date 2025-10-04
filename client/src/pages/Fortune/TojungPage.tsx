@@ -115,7 +115,7 @@ export const TojungPage: React.FC = () => {
         productType="tojung"
         oneTimePrice={7900}
         oneTimeDescription="한 해의 운세를 봅니다"
-        oneTimeFeatures={['365일 캐시', '연간 운세', '월별 운세']}
+        oneTimeFeatures={['1회 이용', '연간 운세', '월별 운세']}
       />
     );
   }
